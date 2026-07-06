@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>devdeck</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #1e1f24; --panel: #26272e; --border: #3a3b44;
+    --text: #e4e4e8; --muted: #9a9aa5; --accent: #4f8cff;
+    --green: #3ecf6e; --red: #e05555; --gray: #6b6b75;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; font-size: 14px;
+    display: flex; flex-direction: column; height: 100vh;
+  }
+  header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 16px; margin: 0 12px 0 0; color: var(--accent); }
+  select, input, button {
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 14px;
+  }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger { color: var(--red); }
+  .spacer { flex: 1; }
+  main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  #content { flex: 1; overflow-y: auto; padding: 16px; }
+  .empty { color: var(--muted); text-align: center; margin-top: 60px; }
+
+  /* 服務狀態列 */
+  #services { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .svc {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 12px;
+  }
+  .light { width: 10px; height: 10px; border-radius: 50%; background: var(--gray); }
+  .light.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .light.off { background: var(--red); }
+  .svc small { color: var(--muted); }
+
+  /* 動作按鈕 */
+  .category { margin-bottom: 20px; }
+  .category h2 {
+    font-size: 13px; color: var(--muted); font-weight: normal;
+    margin: 0 0 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px;
+  }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .action {
+    display: flex; align-items: stretch;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    overflow: hidden;
+  }
+  .action > .run {
+    border: none; border-radius: 0; background: none; padding: 10px 16px;
+    font-size: 14px; text-align: left;
+  }
+  .action > .run:hover { background: rgba(79,140,255,.12); }
+  .action > .run.running { color: var(--accent); }
+  .action > .run .file { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .action .mgmt { display: none; }
+  body.manage .action .mgmt {
+    display: flex; flex-direction: column; border-left: 1px solid var(--border);
+  }
+  .action .mgmt button { border: none; border-radius: 0; padding: 2px 8px; flex: 1; font-size: 12px; }
+  .broken { opacity: .5; }
+  .broken .run { text-decoration: line-through; }
+
+  /* 輸出面板 */
+  #output-panel {
+    height: 260px; display: flex; flex-direction: column;
+    border-top: 1px solid var(--border); background: #17181c;
+  }
+  #output-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 12px; color: var(--muted); font-size: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  #output {
+    flex: 1; overflow-y: auto; margin: 0; padding: 8px 12px;
+    font-family: Consolas, monospace; font-size: 13px; white-space: pre-wrap; word-break: break-all;
+  }
+  #output .err { color: var(--red); }
+  #output .meta { color: var(--muted); }
+
+  /* dialogs */
+  dialog {
+    background: var(--panel); color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px; padding: 20px; min-width: 420px;
+  }
+  dialog::backdrop { background: rgba(0,0,0,.5); }
+  dialog h3 { margin: 0 0 14px; font-size: 15px; }
+  dialog label { display: block; margin-bottom: 10px; color: var(--muted); font-size: 13px; }
+  dialog label input, dialog label select { display: block; width: 100%; margin-top: 4px; }
+  dialog .btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  #svc-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  #svc-table td { padding: 3px 4px; }
+  #svc-table input { width: 100%; }
+  fieldset { border: 1px solid var(--border); border-radius: 8px; margin: 14px 0 0; }
+  fieldset legend { color: var(--muted); font-size: 13px; padding: 0 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>devdeck</h1>
+  <select id="project-select"></select>
+  <button id="btn-add-project">＋ 新增專案</button>
+  <button id="btn-edit-project" class="mgmt-only" hidden>編輯專案</button>
+  <button id="btn-add-action" hidden>＋ 新增動作</button>
+  <span class="spacer"></span>
+  <label style="color:var(--muted)"><input type="checkbox" id="manage-toggle"> 管理模式</label>
+</header>
+
+<main>
+  <div id="content">
+    <div id="services"></div>
+    <div id="action-list"></div>
+    <div id="empty" class="empty" hidden></div>
+  </div>
+  <div id="output-panel">
+    <div id="output-head"><span id="output-title">輸出</span><span class="spacer"></span>
+      <button id="btn-clear-output" style="font-size:12px;padding:2px 8px">清除</button></div>
+    <pre id="output"></pre>
+  </div>
+</main>
+
+<!-- 專案 dialog -->
+<dialog id="project-dialog">
+  <h3 id="project-dialog-title">新增專案</h3>
+  <label>專案名稱 <input id="p-name" required></label>
+  <label>專案路徑 <input id="p-path" placeholder="D:\git\web\myproject" required></label>
+  <label>腳本目錄（相對於專案路徑）<input id="p-scripts" value="scripts"></label>
+  <label>venv 路徑（相對於專案路徑）<input id="p-venv" value=".venv"></label>
+  <fieldset id="svc-fieldset" hidden>
+    <legend>服務（狀態監測）</legend>
+    <table id="svc-table">
+      <thead><tr>
+        <td style="color:var(--muted)">名稱</td>
+        <td style="color:var(--muted)">port</td>
+        <td style="color:var(--muted)">PID 檔（選填）</td><td></td>
+      </tr></thead>
+      <tbody id="svc-rows"></tbody>
+    </table>
+    <button id="btn-add-svc" style="font-size:12px">＋ 加入服務</button>
+  </fieldset>
+  <div class="btns">
+    <button id="btn-del-project" class="danger" hidden>刪除專案</button>
+    <span class="spacer"></span>
+    <button onclick="document.getElementById('project-dialog').close()">取消</button>
+    <button id="btn-save-project" class="primary">儲存</button>
+  </div>
+</dialog>
+
+<!-- 動作 dialog -->
+<dialog id="action-dialog">
+  <h3 id="action-dialog-title">新增動作</h3>
+  <label>腳本檔案 <select id="a-script"></select></label>
+  <label>顯示名稱 <input id="a-label" required></label>
+  <label>分類（選填）<input id="a-category" list="category-list"><datalist id="category-list"></datalist></label>
+  <label>關聯服務（常駐型腳本選這個，狀態燈會歸在該服務）<select id="a-service"></select></label>
+  <label>工作目錄（選填，預設為專案路徑）<input id="a-workdir"></label>
+  <label>排序（數字小的在前）<input id="a-sort" type="number" value="0"></label>
+  <div class="btns">
+    <button id="btn-del-action" class="danger" hidden>刪除動作</button>
+    <span class="spacer"></span>
+    <button onclick="document.getElementById('action-dialog').close()">取消</button>
+    <button id="btn-save-action" class="primary">儲存</button>
+  </div>
+</dialog>
+
+<script>
+const $ = id => document.getElementById(id);
+const state = {
+  projects: [], projectId: null, services: [], actions: [], scan: [],
+  editingActionId: null, editingProject: false, statusTimer: null, es: null,
+};
+
+async function api(method, url, body) {
+  const res = await fetch(url, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    let msg = res.statusText;
+    try { msg = (await res.json()).detail || msg; } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+const toast = msg => alert(msg);
+
+/* ---------- 專案 ---------- */
+
+async function loadProjects(selectId) {
+  state.projects = await api("GET", "/api/projects");
+  const sel = $("project-select");
+  sel.innerHTML = "";
+  for (const p of state.projects) {
+    const opt = document.createElement("option");
+    opt.value = p.id; opt.textContent = p.name;
+    sel.appendChild(opt);
+  }
+  const remembered = selectId ?? Number(localStorage.getItem("devdeck.project"));
+  const target = state.projects.find(p => p.id === remembered) || state.projects[0];
+  await selectProject(target ? target.id : null);
+}
+
+async function selectProject(id) {
+  state.projectId = id;
+  $("btn-add-action").hidden = !id;
+  $("btn-edit-project").hidden = !id;
+  if (!id) {
+    $("services").innerHTML = ""; $("action-list").innerHTML = "";
+    $("empty").hidden = false;
+    $("empty").textContent = "還沒有專案，按「＋ 新增專案」開始。";
+    return;
+  }
+  localStorage.setItem("devdeck.project", id);
+  $("project-select").value = id;
+  [state.services, state.actions] = await Promise.all([
+    api("GET", `/api/projects/${id}/services`),
+    api("GET", `/api/projects/${id}/actions`),
+  ]);
+  renderActions();
+  refreshStatus();
+}
+
+function currentProject() {
+  return state.projects.find(p => p.id === state.projectId);
+}
+
+/* ---------- 服務狀態 ---------- */
+
+async function refreshStatus() {
+  if (!state.projectId) return;
+  let list;
+  try { list = await api("GET", `/api/projects/${state.projectId}/status`); }
+  catch { return; }
+  const box = $("services");
+  box.innerHTML = "";
+  for (const s of list) {
+    const div = document.createElement("div");
+    div.className = "svc";
+    const light = s.listening ? "on" : "off";
+    let extra = s.listening ? "運行中" : "已停止";
+    if (s.pid != null) extra += s.pid_alive ? `（PID ${s.pid}）` : `（PID 檔殘留）`;
+    div.innerHTML = `<span class="light ${light}"></span><b>${esc(s.name)}</b>
+      <small>:${s.port} ${esc(extra)}</small>`;
+    box.appendChild(div);
+  }
+}
+
+function startStatusPolling() {
+  clearInterval(state.statusTimer);
+  state.statusTimer = setInterval(refreshStatus, 3000);
+}
+
+/* ---------- 動作清單 ---------- */
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g,
+    c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function renderActions() {
+  const box = $("action-list");
+  box.innerHTML = "";
+  $("empty").hidden = state.actions.length > 0;
+  if (!state.actions.length) {
+    $("empty").textContent = "此專案還沒有動作，按「＋ 新增動作」從腳本目錄挑選。";
+    return;
+  }
+  const groups = new Map();
+  for (const a of state.actions) {
+    const key = a.category || "未分類";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(a);
+  }
+  for (const [cat, items] of groups) {
+    const div = document.createElement("div");
+    div.className = "category";
+    div.innerHTML = `<h2>${esc(cat)}</h2>`;
+    const row = document.createElement("div");
+    row.className = "actions";
+    for (const a of items) {
+      const card = document.createElement("div");
+      card.className = "action";
+      card.innerHTML = `
+        <button class="run" data-id="${a.id}">${esc(a.label)}
+          <span class="file">${esc(a.script_file)}</span></button>
+        <span class="mgmt">
+          <button class="edit" data-id="${a.id}">編輯</button>
+        </span>`;
+      row.appendChild(card);
+    }
+    div.appendChild(row);
+    box.appendChild(div);
+  }
+}
+
+/* ---------- 執行（SSE）---------- */
+
+function appendOutput(text, cls) {
+  const out = $("output");
+  const span = document.createElement("span");
+  if (cls) span.className = cls;
+  span.textContent = text + "\n";
+  out.appendChild(span);
+  out.scrollTop = out.scrollHeight;
+}
+
+function runAction(id, btn) {
+  if (state.es) { state.es.close(); state.es = null; }
+  document.querySelectorAll(".run.running").forEach(b => b.classList.remove("running"));
+  btn.classList.add("running");
+  const label = btn.childNodes[0].textContent.trim();
+  $("output-title").textContent = `輸出 — ${label}`;
+  $("output").innerHTML = "";
+  const es = new EventSource(`/api/actions/${id}/run`);
+  state.es = es;
+  const finish = () => { es.close(); state.es = null; btn.classList.remove("running"); refreshStatus(); };
+  es.addEventListener("start", e => {
+    const d = JSON.parse(e.data);
+    appendOutput(`$ ${d.cmd.join(" ")}`, "meta");
+    appendOutput(`  (cwd: ${d.cwd})`, "meta");
+  });
+  es.addEventListener("line", e => appendOutput(JSON.parse(e.data)));
+  es.addEventListener("done", e => {
+    const d = JSON.parse(e.data);
+    appendOutput(`— 結束，exit code ${d.exit_code} —`, d.exit_code === 0 ? "meta" : "err");
+    finish();
+  });
+  es.addEventListener("error", e => {
+    if (e.data) appendOutput(JSON.parse(e.data), "err");
+    else appendOutput("— 連線中斷 —", "err");
+    finish();
+  });
+}
+
+/* ---------- 專案 dialog ---------- */
+
+function svcRow(s = {}) {
+  const tr = document.createElement("tr");
+  tr.dataset.id = s.id || "";
+  tr.innerHTML = `
+    <td><input class="s-name" value="${esc(s.name || "")}" placeholder="fastapi"></td>
+    <td><input class="s-port" type="number" value="${s.port ?? ""}" placeholder="8000" style="width:80px"></td>
+    <td><input class="s-pid" value="${esc(s.pid_file || "")}" placeholder="uvicorn.pid"></td>
+    <td><button class="danger s-del" style="font-size:12px">刪</button></td>`;
+  tr.querySelector(".s-del").onclick = async () => {
+    if (s.id) {
+      if (!confirm(`刪除服務「${s.name}」？`)) return;
+      await api("DELETE", `/api/services/${s.id}`);
+    }
+    tr.remove();
+  };
+  return tr;
+}
+
+function openProjectDialog(editing) {
+  state.editingProject = editing;
+  const p = editing ? currentProject() : null;
+  $("project-dialog-title").textContent = editing ? "編輯專案" : "新增專案";
+  $("p-name").value = p ? p.name : "";
+  $("p-path").value = p ? p.path : "";
+  $("p-scripts").value = p ? p.scripts_dir : "scripts";
+  $("p-venv").value = p ? p.venv_path : ".venv";
+  $("btn-del-project").hidden = !editing;
+  $("svc-fieldset").hidden = !editing;
+  if (editing) {
+    const tbody = $("svc-rows");
+    tbody.innerHTML = "";
+    for (const s of state.services) tbody.appendChild(svcRow(s));
+  }
+  $("project-dialog").showModal();
+}
+
+async function saveProject() {
+  const body = {
+    name: $("p-name").value.trim(),
+    path: $("p-path").value.trim(),
+    scripts_dir: $("p-scripts").value.trim() || "scripts",
+    venv_path: $("p-venv").value.trim() || ".venv",
+  };
+  if (!body.name || !body.path) return toast("名稱與路徑必填");
+  try {
+    let id = state.projectId;
+    if (state.editingProject) {
+      await api("PUT", `/api/projects/${id}`, body);
+      for (const tr of $("svc-rows").children) {
+        const svc = {
+          name: tr.querySelector(".s-name").value.trim(),
+          port: Number(tr.querySelector(".s-port").value),
+          pid_file: tr.querySelector(".s-pid").value.trim() || null,
+        };
+        if (!svc.name || !svc.port) continue;
+        if (tr.dataset.id) await api("PUT", `/api/services/${tr.dataset.id}`, svc);
+        else await api("POST", `/api/projects/${id}/services`, svc);
+      }
+    } else {
+      id = (await api("POST", "/api/projects", body)).id;
+    }
+    $("project-dialog").close();
+    await loadProjects(id);
+    if (!state.editingProject) {
+      // 新專案：直接再開編輯模式讓使用者補服務設定
+      openProjectDialog(true);
+    }
+  } catch (e) { toast(e.message); }
+}
+
+/* ---------- 動作 dialog ---------- */
+
+async function openActionDialog(actionId) {
+  state.editingActionId = actionId;
+  const a = actionId ? state.actions.find(x => x.id === actionId) : null;
+  $("action-dialog-title").textContent = a ? "編輯動作" : "新增動作";
+  try { state.scan = await api("GET", `/api/projects/${state.projectId}/scan`); }
+  catch (e) { return toast(e.message); }
+
+  const sel = $("a-script");
+  sel.innerHTML = "";
+  for (const s of state.scan) {
+    if (s.added && (!a || s.file !== a.script_file)) continue;  // 已新增的不重複列出
+    const opt = document.createElement("option");
+    opt.value = s.file; opt.textContent = s.file;
+    sel.appendChild(opt);
+  }
+  if (!sel.options.length) return toast("腳本目錄內沒有可新增的腳本了");
+
+  const svcSel = $("a-service");
+  svcSel.innerHTML = `<option value="">（無 — 一次性腳本）</option>`;
+  for (const s of state.services) {
+    const opt = document.createElement("option");
+    opt.value = s.id; opt.textContent = `${s.name} (:${s.port})`;
+    svcSel.appendChild(opt);
+  }
+
+  const dl = $("category-list");
+  dl.innerHTML = "";
+  for (const c of new Set(state.actions.map(x => x.category).filter(Boolean))) {
+    const opt = document.createElement("option");
+    opt.value = c;
+    dl.appendChild(opt);
+  }
+
+  sel.value = a ? a.script_file : sel.options[0].value;
+  $("a-label").value = a ? a.label : "";
+  $("a-category").value = a?.category || "";
+  svcSel.value = a?.service_id || "";
+  $("a-workdir").value = a?.workdir || "";
+  $("a-workdir").placeholder = currentProject()?.path || "";
+  $("a-sort").value = a?.sort_order ?? 0;
+  $("btn-del-action").hidden = !a;
+  $("action-dialog").showModal();
+}
+
+async function saveAction() {
+  const body = {
+    script_file: $("a-script").value,
+    label: $("a-label").value.trim(),
+    category: $("a-category").value.trim() || null,
+    service_id: $("a-service").value ? Number($("a-service").value) : null,
+    workdir: $("a-workdir").value.trim() || null,
+    sort_order: Number($("a-sort").value) || 0,
+  };
+  if (!body.label) return toast("顯示名稱必填");
+  try {
+    if (state.editingActionId) await api("PUT", `/api/actions/${state.editingActionId}`, body);
+    else await api("POST", `/api/projects/${state.projectId}/actions`, body);
+    $("action-dialog").close();
+    await selectProject(state.projectId);
+  } catch (e) { toast(e.message); }
+}
+
+/* ---------- 事件繫結 ---------- */
+
+$("project-select").onchange = e => selectProject(Number(e.target.value));
+$("btn-add-project").onclick = () => openProjectDialog(false);
+$("btn-edit-project").onclick = () => openProjectDialog(true);
+$("btn-save-project").onclick = saveProject;
+$("btn-del-project").onclick = async () => {
+  const p = currentProject();
+  if (!confirm(`刪除專案「${p.name}」及其所有動作設定？（不會動到專案檔案本身）`)) return;
+  await api("DELETE", `/api/projects/${p.id}`);
+  $("project-dialog").close();
+  await loadProjects();
+};
+$("btn-add-svc").onclick = e => { e.preventDefault(); $("svc-rows").appendChild(svcRow()); };
+$("btn-add-action").onclick = () => openActionDialog(null);
+$("btn-save-action").onclick = saveAction;
+$("btn-del-action").onclick = async () => {
+  const a = state.actions.find(x => x.id === state.editingActionId);
+  if (!confirm(`刪除動作「${a.label}」？`)) return;
+  await api("DELETE", `/api/actions/${a.id}`);
+  $("action-dialog").close();
+  await selectProject(state.projectId);
+};
+$("manage-toggle").onchange = e => document.body.classList.toggle("manage", e.target.checked);
+$("btn-clear-output").onclick = () => { $("output").innerHTML = ""; $("output-title").textContent = "輸出"; };
+$("action-list").addEventListener("click", e => {
+  const runBtn = e.target.closest("button.run");
+  if (runBtn) return runAction(Number(runBtn.dataset.id), runBtn);
+  const editBtn = e.target.closest("button.edit");
+  if (editBtn) return openActionDialog(Number(editBtn.dataset.id));
+});
+
+loadProjects();
+startStatusPolling();
+</script>
+</body>
+</html>
