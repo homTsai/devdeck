@@ -11,6 +11,7 @@
     --green: #3ecf6e; --red: #e05555; --gray: #6b6b75;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }  /* 避免 display 規則蓋掉 hidden 屬性 */
   body {
     margin: 0; background: var(--bg); color: var(--text);
     font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; font-size: 14px;
