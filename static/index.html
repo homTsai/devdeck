@@ -64,6 +64,8 @@
   }
   .action > .run:hover { background: rgba(79,140,255,.12); }
   .action > .run.running { color: var(--accent); }
+  .action > .run:disabled { opacity: .35; cursor: not-allowed; }
+  .action > .run:disabled:hover { background: none; }
   .action > .run .file { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
   .action .mgmt { display: none; }
   body.manage .action .mgmt {
@@ -171,7 +173,10 @@
     <input id="a-command" placeholder="alembic upgrade head"></label>
   <label>顯示名稱 <input id="a-label" required></label>
   <label>分類（選填）<input id="a-category" list="category-list"><datalist id="category-list"></datalist></label>
-  <label>關聯服務（常駐型腳本選這個，狀態燈會歸在該服務）<select id="a-service"></select></label>
+  <fieldset style="margin:0 0 10px">
+    <legend>按鈕狀態關聯（勾選的條件「全部成立」時停用此按鈕）</legend>
+    <div id="a-services"></div>
+  </fieldset>
   <label>工作目錄（選填，預設為專案路徑）<input id="a-workdir"></label>
   <label>排序（數字小的在前）<input id="a-sort" type="number" value="0"></label>
   <div class="btns">
@@ -186,6 +191,7 @@
 const $ = id => document.getElementById(id);
 const state = {
   projects: [], projectId: null, services: [], actions: [], scan: [],
+  status: new Map(),  // service_id -> listening(bool)
   editingActionId: null, editingProject: false, statusTimer: null, es: null,
 };
 
@@ -257,6 +263,8 @@ async function refreshStatus() {
   let list;
   try { list = await api("GET", `/api/projects/${state.projectId}/status`); }
   catch { return; }
+  state.status = new Map(list.map(s => [s.id, s.listening]));
+  applyButtonStates();
   const box = $("services");
   box.innerHTML = "";
   for (const s of list) {
@@ -268,6 +276,21 @@ async function refreshStatus() {
     div.innerHTML = `<span class="light ${light}"></span><b>${esc(s.name)}</b>
       <small>:${s.port} ${esc(extra)}</small>`;
     box.appendChild(div);
+  }
+}
+
+function applyButtonStates() {
+  // 勾選的條件「全部成立」時停用按鈕；沒有關聯或狀態未知則不停用
+  for (const a of state.actions) {
+    const btn = document.querySelector(`button.run[data-id="${a.id}"]`);
+    if (!btn) continue;
+    const links = a.services || [];
+    let disabled = false;
+    if (links.length && links.every(l => state.status.has(l.service_id))) {
+      disabled = links.every(
+        l => (l.disable_when === "running") === state.status.get(l.service_id));
+    }
+    btn.disabled = disabled;
   }
 }
 
@@ -317,6 +340,7 @@ function renderActions() {
     div.appendChild(row);
     box.appendChild(div);
   }
+  applyButtonStates();
 }
 
 /* ---------- 執行（SSE）---------- */
@@ -453,12 +477,24 @@ async function openActionDialog(actionId) {
     sel.appendChild(opt);
   }
 
-  const svcSel = $("a-service");
-  svcSel.innerHTML = `<option value="">（無 — 一次性腳本）</option>`;
+  const box = $("a-services");
+  box.innerHTML = state.services.length
+    ? "" : `<small style="color:var(--muted)">此專案尚未設定服務（在「編輯專案」中加入）</small>`;
   for (const s of state.services) {
-    const opt = document.createElement("option");
-    opt.value = s.id; opt.textContent = `${s.name} (:${s.port})`;
-    svcSel.appendChild(opt);
+    const link = a?.services?.find(x => x.service_id === s.id);
+    const running = state.status.get(s.id);
+    const row = document.createElement("label");
+    row.style.cssText = "display:flex;align-items:center;gap:8px;margin:6px 0";
+    row.innerHTML = `
+      <input type="checkbox" class="l-check" data-id="${s.id}" ${link ? "checked" : ""}>
+      <span class="light ${running === true ? "on" : running === false ? "off" : ""}"></span>
+      <span style="min-width:110px;color:var(--text)">${esc(s.name)} (:${s.port})</span>
+      <select class="l-when">
+        <option value="running">運行中時停用</option>
+        <option value="stopped">停止時停用</option>
+      </select>`;
+    row.querySelector(".l-when").value = link?.disable_when || "running";
+    box.appendChild(row);
   }
 
   const dl = $("category-list");
@@ -474,7 +510,6 @@ async function openActionDialog(actionId) {
   $("a-command").value = a?.command || "";
   $("a-label").value = a ? a.label : "";
   $("a-category").value = a?.category || "";
-  svcSel.value = a?.service_id || "";
   $("a-workdir").value = a?.workdir || "";
   $("a-workdir").placeholder = currentProject()?.path || "";
   $("a-sort").value = a?.sort_order ?? 0;
@@ -498,7 +533,10 @@ async function saveAction() {
     command: type === "command" ? ($("a-command").value.trim() || null) : null,
     label: $("a-label").value.trim(),
     category: $("a-category").value.trim() || null,
-    service_id: $("a-service").value ? Number($("a-service").value) : null,
+    services: [...document.querySelectorAll("#a-services .l-check:checked")].map(ch => ({
+      service_id: Number(ch.dataset.id),
+      disable_when: ch.closest("label").querySelector(".l-when").value,
+    })),
     workdir: $("a-workdir").value.trim() || null,
     sort_order: Number($("a-sort").value) || 0,
   };

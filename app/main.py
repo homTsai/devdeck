@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 
+from typing import Literal
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -34,11 +36,16 @@ class ServiceIn(BaseModel):
     pid_file: str | None = None
 
 
+class ActionServiceLink(BaseModel):
+    service_id: int
+    disable_when: Literal["running", "stopped"]
+
+
 class ActionIn(BaseModel):
     script_file: str | None = None
     command: str | None = None
     label: str
-    service_id: int | None = None
+    services: list[ActionServiceLink] = []
     workdir: str | None = None
     category: str | None = None
     sort_order: int = 0
@@ -181,12 +188,32 @@ async def project_status(project_id: int):
 
 # ---------- actions ----------
 
+def _replace_links(conn, action_id: int, links: list[ActionServiceLink]):
+    conn.execute("DELETE FROM action_services WHERE action_id=?", (action_id,))
+    for link in links:
+        conn.execute(
+            "INSERT INTO action_services (action_id, service_id, disable_when) VALUES (?,?,?)",
+            (action_id, link.service_id, link.disable_when),
+        )
+
+
 @app.get("/api/projects/{project_id}/actions")
 def list_actions(project_id: int):
     get_project(project_id)
     with db.get_conn() as conn:
-        return [dict(r) for r in conn.execute(
+        actions = [dict(r) for r in conn.execute(
             "SELECT * FROM actions WHERE project_id=? ORDER BY sort_order, id", (project_id,))]
+        links: dict[int, list] = {}
+        for r in conn.execute(
+            "SELECT l.action_id, l.service_id, l.disable_when"
+            " FROM action_services l JOIN actions a ON a.id = l.action_id"
+            " WHERE a.project_id=?", (project_id,)
+        ):
+            links.setdefault(r["action_id"], []).append(
+                {"service_id": r["service_id"], "disable_when": r["disable_when"]})
+    for a in actions:
+        a["services"] = links.get(a["id"], [])
+    return actions
 
 
 @app.post("/api/projects/{project_id}/actions")
@@ -195,11 +222,12 @@ def create_action(project_id: int, body: ActionIn):
     body.validate_source()
     with db.get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO actions (project_id, service_id, script_file, command, label, workdir, category, sort_order)"
-            " VALUES (?,?,?,?,?,?,?,?)",
-            (project_id, body.service_id, body.script_file, body.command, body.label,
+            "INSERT INTO actions (project_id, script_file, command, label, workdir, category, sort_order)"
+            " VALUES (?,?,?,?,?,?,?)",
+            (project_id, body.script_file, body.command, body.label,
              body.workdir, body.category, body.sort_order),
         )
+        _replace_links(conn, cur.lastrowid, body.services)
         return {"id": cur.lastrowid}
 
 
@@ -208,13 +236,14 @@ def update_action(action_id: int, body: ActionIn):
     body.validate_source()
     with db.get_conn() as conn:
         cur = conn.execute(
-            "UPDATE actions SET service_id=?, script_file=?, command=?, label=?, workdir=?, category=?, sort_order=?"
+            "UPDATE actions SET script_file=?, command=?, label=?, workdir=?, category=?, sort_order=?"
             " WHERE id=?",
-            (body.service_id, body.script_file, body.command, body.label, body.workdir,
+            (body.script_file, body.command, body.label, body.workdir,
              body.category, body.sort_order, action_id),
         )
         if cur.rowcount == 0:
             raise HTTPException(404, "找不到動作")
+        _replace_links(conn, action_id, body.services)
     return {"ok": True}
 
 
