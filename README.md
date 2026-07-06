@@ -27,6 +27,10 @@ macOS / Linux：
 首次執行會自動建立 `.venv` 並安裝相依套件，之後開啟 <http://127.0.0.1:7999>。
 伺服器在背景執行、不顯示視窗；若已在執行，再次啟動只會開啟瀏覽器。
 
+Port 預設 `7999`；被其他程式占用時自動往下改用 `7998`–`7990`（實際 port 記錄在資料目錄的
+`devdeck.port`，啟動腳本會自動讀取，並以 `/health` 端點確認是 devdeck 本尊而非別的程式）。
+也可用環境變數 `DEVDECK_PORT` 明確指定（指定後不做 fallback）。
+
 Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘選到開始畫面」或「釘選到工作列」。
 
 關閉：面板右上角「關閉工具」按鈕會停止 devdeck 伺服器（不影響已啟動的專案服務）。
@@ -67,7 +71,7 @@ Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘
 
 ### 安全性
 
-- 伺服器只綁 `127.0.0.1:7999`，外部機器在網路層連不進來。
+- 伺服器只綁 `127.0.0.1`，外部機器在網路層連不進來。
 - 所有請求檢查 Host/Origin 必須為本機，防 DNS rebinding 與惡意網頁跨站觸發。
 - 執行端點為 POST + JSON，跨來源會被瀏覽器 preflight 擋下。
 - **API token**：伺服器產生隨機 token 寫入使用者資料目錄的 `devdeck.token`，
@@ -106,6 +110,11 @@ macOS / Linux:
 The first run creates `.venv` and installs dependencies, then opens <http://127.0.0.1:7999>.
 The server runs in the background with no console window; if it is already running, launching
 again just opens the browser.
+
+The port defaults to `7999`; if another program occupies it, devdeck falls back down through
+`7998`–`7990` (the actual port is written to `devdeck.port` in the data directory — launchers
+read it and verify via the `/health` endpoint that it is really devdeck). Set the
+`DEVDECK_PORT` environment variable to pin a port explicitly (no fallback then).
 
 On Windows, after creating the shortcut, search for **devdeck** in the Start Menu and pin it
 to Start or the taskbar.
@@ -157,7 +166,7 @@ launch devdeck from its shortcut again.
 
 ### Security
 
-- The server binds `127.0.0.1:7999` only; other machines cannot connect at the network level.
+- The server binds `127.0.0.1` only; other machines cannot connect at the network level.
 - Every request must carry a local Host/Origin, blocking DNS rebinding and cross-site triggering
   from malicious webpages.
 - The run endpoint is POST + JSON, so cross-origin calls hit the browser's CORS preflight.

@@ -342,6 +342,14 @@ async def run_action(action_id: int, _body: dict = Body(default={})):
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
+# ---------- health ----------
+
+@app.get("/health")
+def health():
+    # 免 token（不在 /api/ 下）：供啟動腳本確認 port 上是不是 devdeck 本尊
+    return {"app": "devdeck"}
+
+
 # ---------- shutdown ----------
 
 @app.post("/api/shutdown")
