@@ -119,6 +119,7 @@
   <button id="btn-add-action" hidden>＋ 新增動作</button>
   <span class="spacer"></span>
   <label style="color:var(--muted)"><input type="checkbox" id="manage-toggle"> 管理模式</label>
+  <button id="btn-shutdown" title="停止 devdeck 伺服器" class="danger">關閉工具</button>
 </header>
 
 <main>
@@ -576,6 +577,13 @@ $("btn-del-action").onclick = async () => {
   await selectProject(state.projectId);
 };
 $("manage-toggle").onchange = e => document.body.classList.toggle("manage", e.target.checked);
+$("btn-shutdown").onclick = async () => {
+  if (!confirm("關閉 devdeck 伺服器？（不影響已啟動的專案服務）")) return;
+  clearInterval(state.statusTimer);
+  try { await api("POST", "/api/shutdown"); } catch {}
+  document.body.innerHTML =
+    `<div class="empty" style="margin-top:80px">devdeck 已關閉，此分頁可以關掉了。</div>`;
+};
 $("btn-clear-output").onclick = () => { $("output").innerHTML = ""; $("output-title").textContent = "輸出"; };
 $("action-list").addEventListener("click", e => {
   const runBtn = e.target.closest("button.run");

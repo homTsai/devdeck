@@ -1,6 +1,8 @@
 """devdeck — 本機開發腳本啟動面板。只綁 127.0.0.1:7999。"""
 
+import asyncio
 import json
+import os
 from pathlib import Path
 
 from typing import Literal
@@ -297,6 +299,15 @@ async def run_action(action_id: int):
             yield ev("error", str(e))
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+# ---------- shutdown ----------
+
+@app.post("/api/shutdown")
+async def shutdown():
+    # 本機小工具，直接結束程序即可；延遲一下讓回應先送出
+    asyncio.get_running_loop().call_later(0.3, os._exit, 0)
+    return {"ok": True}
 
 
 # ---------- static ----------

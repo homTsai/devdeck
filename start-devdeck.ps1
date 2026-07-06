@@ -16,7 +16,7 @@ $alreadyRunning = Test-NetConnection -ComputerName 127.0.0.1 -Port 7999 -Informa
 if (-not $alreadyRunning) {
     Start-Process -FilePath $python `
         -ArgumentList "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "7999" `
-        -WorkingDirectory $root -WindowStyle Minimized
+        -WorkingDirectory $root -WindowStyle Hidden
     for ($i = 0; $i -lt 20; $i++) {
         if (Test-NetConnection -ComputerName 127.0.0.1 -Port 7999 -InformationLevel Quiet -WarningAction SilentlyContinue) { break }
         Start-Sleep -Milliseconds 300
