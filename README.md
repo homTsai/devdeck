@@ -84,6 +84,13 @@ Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘
 
 `.ps1` `.py` `.sh` `.mjs` `.js` `.cmd` `.bat`
 
+### 開發計畫（Roadmap）
+
+- 腳本檔案型動作可設定**固定附加參數**（存於動作設定）。
+- 腳本檔案型動作支援**右鍵開啟對話框**，臨時輸入僅此一次的命令參數後執行。
+- **非專案型指令的歸納**（全域動作群組）；現階段可先把使用者家目錄
+  （如 `C:\Users\{user}`）新增為一個「專案」暫代。
+
 ---
 
 ## English
@@ -180,6 +187,13 @@ launch devdeck from its shortcut again.
 ### Supported script extensions
 
 `.ps1` `.py` `.sh` `.mjs` `.js` `.cmd` `.bat`
+
+### Roadmap
+
+- Persistent extra arguments for script-file actions (stored with the action).
+- Right-click a script-file action to enter one-time arguments in a dialog before running.
+- A proper home for non-project commands (a global action group); for now, adding your home
+  directory (e.g. `C:\Users\{user}`) as a "project" works as a stopgap.
 
 ---
 
