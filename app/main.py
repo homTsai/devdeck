@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import db, runner, status
+from .paths import migrate_legacy_file
 
 app = FastAPI(title="devdeck")
 
@@ -27,7 +28,7 @@ db.init_db()
 LOCAL_NAMES = {"127.0.0.1", "localhost"}
 
 # token 的信任根是「能讀本機檔案」：啟動腳本讀檔帶進網址，服務本身絕不線上發放
-TOKEN_FILE = Path(__file__).resolve().parent.parent / "devdeck.token"
+TOKEN_FILE = migrate_legacy_file("devdeck.token")
 
 
 def _load_or_create_token() -> str:

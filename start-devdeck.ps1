@@ -23,8 +23,8 @@ if (-not $alreadyRunning) {
     }
 }
 
-# 伺服器啟動時會把 API token 寫到 devdeck.token，帶在網址上交付給頁面
-$tokenFile = Join-Path $root "devdeck.token"
+# 伺服器啟動時會把 API token 寫到使用者資料目錄，帶在網址上交付給頁面
+$tokenFile = Join-Path $env:LOCALAPPDATA "devdeck\devdeck.token"
 if (Test-Path $tokenFile) {
     $token = (Get-Content $tokenFile -Raw).Trim()
     if ($token) { $url = "$url/?token=$token" }

@@ -22,9 +22,14 @@ if ! port_up; then
   done
 fi
 
-# 伺服器啟動時會把 API token 寫到 devdeck.token，帶在網址上交付給頁面
-if [ -s "$ROOT/devdeck.token" ]; then
-  URL="$URL/?token=$(tr -d '[:space:]' <"$ROOT/devdeck.token")"
+# 伺服器啟動時會把 API token 寫到使用者資料目錄，帶在網址上交付給頁面
+if [ "$(uname)" = "Darwin" ]; then
+  DATA_DIR="$HOME/Library/Application Support/devdeck"
+else
+  DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/devdeck"
+fi
+if [ -s "$DATA_DIR/devdeck.token" ]; then
+  URL="$URL/?token=$(tr -d '[:space:]' <"$DATA_DIR/devdeck.token")"
 fi
 
 if command -v open >/dev/null 2>&1; then

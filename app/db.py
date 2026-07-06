@@ -2,9 +2,10 @@
 
 import sqlite3
 from contextlib import contextmanager
-from pathlib import Path
 
-DB_PATH = Path(__file__).resolve().parent.parent / "devdeck.db"
+from .paths import migrate_legacy_file
+
+DB_PATH = migrate_legacy_file("devdeck.db")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS projects (

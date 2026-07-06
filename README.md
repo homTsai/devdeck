@@ -54,8 +54,11 @@ Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘
 
 ### 設計說明
 
-- 設定資料存在本檔目錄的 `devdeck.db`（SQLite），**不進版控**——不同電腦可用的腳本本來就不同
-  （Windows/Mac），各機器維護自己的設定，換機器後需重新登記專案與動作。
+- 設定資料（`devdeck.db`）與 API token（`devdeck.token`）存在各平台的使用者資料目錄：
+  Windows `%LOCALAPPDATA%\devdeck\`、macOS `~/Library/Application Support/devdeck/`、
+  Linux `${XDG_DATA_HOME:-~/.local/share}/devdeck/`；舊版放在程式目錄旁的資料會在啟動時
+  自動搬移。設定**不進版控**——不同電腦可用的腳本本來就不同（Windows/Mac），
+  各機器維護自己的設定，換機器後需重新登記專案與動作。
 - 腳本路徑存相對於腳本目錄的檔名，專案搬家只需改專案路徑。
 - 依副檔名分派執行器：`.ps1` → pwsh、`.py` → **該專案 venv 的 python**、`.mjs/.js` → node、
   `.sh` → bash、`.cmd/.bat` → cmd。`.ps1` 在 macOS 需另裝 pwsh，建議在 Mac 上改用
@@ -67,7 +70,7 @@ Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘
 - 伺服器只綁 `127.0.0.1:7999`，外部機器在網路層連不進來。
 - 所有請求檢查 Host/Origin 必須為本機，防 DNS rebinding 與惡意網頁跨站觸發。
 - 執行端點為 POST + JSON，跨來源會被瀏覽器 preflight 擋下。
-- **API token**：伺服器產生隨機 token 寫入本機檔案 `devdeck.token`（不進版控），
+- **API token**：伺服器產生隨機 token 寫入使用者資料目錄的 `devdeck.token`，
   啟動腳本讀檔後帶在網址上交付給頁面，頁面存入 localStorage 後從網址列清除；
   之後所有 API 呼叫以 `X-Devdeck-Token` header 驗證。token 只透過本機檔案發放，
   服務本身不提供任何線上取得 token 的端點。想輪替 token：關閉工具、刪除
@@ -137,8 +140,13 @@ launch devdeck from its shortcut again.
 
 ### Design notes
 
-- Configuration lives in `devdeck.db` (SQLite) next to the app, **not under version control** —
-  the scripts available differ per machine (Windows/Mac), so each machine keeps its own config.
+- Configuration (`devdeck.db`) and the API token (`devdeck.token`) live in the per-platform
+  user data directory: `%LOCALAPPDATA%\devdeck\` on Windows,
+  `~/Library/Application Support/devdeck/` on macOS,
+  `${XDG_DATA_HOME:-~/.local/share}/devdeck/` on Linux (files from the legacy location next
+  to the app are migrated automatically on startup). Configuration is **not under version
+  control** — the scripts available differ per machine (Windows/Mac), so each machine keeps
+  its own config.
 - Actions store the script filename relative to the scripts directory; moving a project only
   requires updating the project path.
 - Interpreter dispatch by extension: `.ps1` → pwsh, `.py` → **the project venv's python**,
@@ -153,8 +161,8 @@ launch devdeck from its shortcut again.
 - Every request must carry a local Host/Origin, blocking DNS rebinding and cross-site triggering
   from malicious webpages.
 - The run endpoint is POST + JSON, so cross-origin calls hit the browser's CORS preflight.
-- **API token**: the server writes a random token to the local file `devdeck.token`
-  (git-ignored). The launcher reads it and hands it to the page via the URL; the page stores it
+- **API token**: the server writes a random token to `devdeck.token` in the user data
+  directory. The launcher reads it and hands it to the page via the URL; the page stores it
   in localStorage and scrubs the URL. All API calls are then authenticated with the
   `X-Devdeck-Token` header. The token is only ever issued through the local file — the service
   has no online endpoint to obtain one. To rotate: close the tool, delete `devdeck.token`,
