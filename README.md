@@ -62,3 +62,10 @@ Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘
 ## 支援的腳本副檔名
 
 `.ps1` `.py` `.sh` `.mjs` `.js` `.cmd` `.bat`
+
+## License
+
+Copyright (C) 2026 homTsai <hom5473@gmail.com>
+
+本專案以 [GNU General Public License v3.0](LICENSE) 授權釋出：可自由使用、修改、散布，
+但改作對外發布時必須以相同授權開源。
