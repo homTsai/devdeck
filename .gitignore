@@ -10,3 +10,7 @@ devdeck.token
 *.egg-info/
 dist/
 build/
+
+# codegraph 分析快取
+codegraph/
+.codegraph/
