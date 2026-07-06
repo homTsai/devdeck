@@ -22,6 +22,11 @@ if ! port_up; then
   done
 fi
 
+# 伺服器啟動時會把 API token 寫到 devdeck.token，帶在網址上交付給頁面
+if [ -s "$ROOT/devdeck.token" ]; then
+  URL="$URL/?token=$(tr -d '[:space:]' <"$ROOT/devdeck.token")"
+fi
+
 if command -v open >/dev/null 2>&1; then
   open "$URL"          # macOS
 else

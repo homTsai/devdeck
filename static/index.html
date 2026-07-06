@@ -196,6 +196,23 @@
 
 <script>
 const $ = id => document.getElementById(id);
+
+// token 由啟動腳本帶在 ?token=，收下存 localStorage 後立刻從網址列清掉
+{
+  const urlToken = new URLSearchParams(location.search).get("token");
+  if (urlToken) {
+    localStorage.setItem("devdeck.token", urlToken);
+    history.replaceState(null, "", location.pathname);
+  }
+}
+const TOKEN = () => localStorage.getItem("devdeck.token") || "";
+
+function authLost() {
+  clearInterval(state.statusTimer);
+  document.body.innerHTML = `<div class="empty" style="margin-top:80px">
+    驗證失效：請重新點一次 devdeck 啟動捷徑取得授權。<br>
+    <small>Token missing or invalid — launch devdeck from its shortcut/launcher again.</small></div>`;
+}
 const state = {
   projects: [], projectId: null, services: [], actions: [], scan: [],
   status: new Map(),  // service_id -> listening(bool)
@@ -205,9 +222,13 @@ const state = {
 async function api(method, url, body) {
   const res = await fetch(url, {
     method,
-    headers: body ? { "Content-Type": "application/json" } : undefined,
+    headers: {
+      "X-Devdeck-Token": TOKEN(),
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
     body: body ? JSON.stringify(body) : undefined,
   });
+  if (res.status === 401) { authLost(); throw new Error("unauthorized"); }
   if (!res.ok) {
     let msg = res.statusText;
     try { msg = (await res.json()).detail || msg; } catch {}
@@ -396,9 +417,11 @@ async function runAction(id, btn) {
   state.runAbort = ctrl;
   try {
     const res = await fetch(`/api/actions/${id}/run`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Devdeck-Token": TOKEN() },
       body: "{}", signal: ctrl.signal,
     });
+    if (res.status === 401) { authLost(); return; }
     if (!res.ok) {
       appendOutput(`HTTP ${res.status}`, "err");
     } else {

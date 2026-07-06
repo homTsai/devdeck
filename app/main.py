@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import secrets
 from pathlib import Path
 
 from typing import Literal
@@ -25,6 +26,24 @@ db.init_db()
 
 LOCAL_NAMES = {"127.0.0.1", "localhost"}
 
+# token 的信任根是「能讀本機檔案」：啟動腳本讀檔帶進網址，服務本身絕不線上發放
+TOKEN_FILE = Path(__file__).resolve().parent.parent / "devdeck.token"
+
+
+def _load_or_create_token() -> str:
+    try:
+        token = TOKEN_FILE.read_text(encoding="utf-8").strip()
+        if token:
+            return token
+    except OSError:
+        pass
+    token = secrets.token_urlsafe(32)
+    TOKEN_FILE.write_text(token, encoding="utf-8")
+    return token
+
+
+API_TOKEN = _load_or_create_token()
+
 
 @app.middleware("http")
 async def local_origin_guard(request: Request, call_next):
@@ -35,6 +54,10 @@ async def local_origin_guard(request: Request, call_next):
     origin = request.headers.get("origin")
     if origin and urlparse(origin).hostname not in LOCAL_NAMES:
         return JSONResponse({"detail": "forbidden"}, status_code=403)
+    if request.url.path.startswith("/api/"):
+        supplied = request.headers.get("x-devdeck-token", "")
+        if not secrets.compare_digest(supplied, API_TOKEN):
+            return JSONResponse({"detail": "invalid token"}, status_code=401)
     return await call_next(request)
 
 
