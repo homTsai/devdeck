@@ -44,7 +44,9 @@
 - 依副檔名分派執行器：`.ps1` → pwsh、`.py` → **該專案 venv 的 python**、`.mjs/.js` → node、
   `.sh` → bash、`.cmd/.bat` → cmd。
 - 狀態偵測以 port 探測為主；若服務設定了 PID 檔（如 `uvicorn.pid`），會額外顯示 PID 與殘留提示。
-- 伺服器只綁 `127.0.0.1:7999`，不對外開放。
+- 安全性：伺服器只綁 `127.0.0.1:7999`（外部機器在網路層連不進來）；所有請求檢查
+  Host/Origin 必須為本機（防 DNS rebinding 與惡意網頁跨站觸發）；執行端點為
+  POST + JSON（跨來源會被瀏覽器 preflight 擋下，無法用 `<img>`/表單偷觸發）。
 
 ## 支援的腳本副檔名
 

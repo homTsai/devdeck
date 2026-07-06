@@ -6,9 +6,10 @@ import os
 from pathlib import Path
 
 from typing import Literal
+from urllib.parse import urlparse
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import Body, FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -21,6 +22,20 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 SCRIPT_EXTS = {".ps1", ".py", ".sh", ".mjs", ".js", ".cmd", ".bat"}
 
 db.init_db()
+
+LOCAL_NAMES = {"127.0.0.1", "localhost"}
+
+
+@app.middleware("http")
+async def local_origin_guard(request: Request, call_next):
+    """只服務本機來源：擋 DNS rebinding（Host 偽裝）與惡意網頁的跨站請求（Origin 非本機）。"""
+    host = request.headers.get("host", "").split(":")[0].lower()
+    if host not in LOCAL_NAMES:
+        return JSONResponse({"detail": "forbidden"}, status_code=403)
+    origin = request.headers.get("origin")
+    if origin and urlparse(origin).hostname not in LOCAL_NAMES:
+        return JSONResponse({"detail": "forbidden"}, status_code=403)
+    return await call_next(request)
 
 
 # ---------- models ----------
@@ -261,8 +276,9 @@ def delete_action(action_id: int):
 
 # ---------- run (SSE) ----------
 
-@app.get("/api/actions/{action_id}/run")
-async def run_action(action_id: int):
+@app.post("/api/actions/{action_id}/run")
+async def run_action(action_id: int, _body: dict = Body(default={})):
+    # POST + JSON body：跨來源時瀏覽器必先 preflight，惡意網頁無法直接觸發執行
     with db.get_conn() as conn:
         action = conn.execute("SELECT * FROM actions WHERE id=?", (action_id,)).fetchone()
     if not action:

@@ -199,7 +199,7 @@ const $ = id => document.getElementById(id);
 const state = {
   projects: [], projectId: null, services: [], actions: [], scan: [],
   status: new Map(),  // service_id -> listening(bool)
-  editingActionId: null, editingProject: false, statusTimer: null, es: null,
+  editingActionId: null, editingProject: false, statusTimer: null, runAbort: null,
 };
 
 async function api(method, url, body) {
@@ -364,32 +364,64 @@ function appendOutput(text, cls) {
   out.scrollTop = out.scrollHeight;
 }
 
-function runAction(id, btn) {
-  if (state.es) { state.es.close(); state.es = null; }
+function handleRunEvent(block) {
+  let event = "message", data = "";
+  for (const line of block.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) data += line.slice(5).trim();
+  }
+  if (!data) return;
+  const d = JSON.parse(data);
+  if (event === "start") {
+    appendOutput(`$ ${d.cmd.join(" ")}`, "meta");
+    appendOutput(`  (cwd: ${d.cwd})`, "meta");
+  } else if (event === "line") {
+    appendOutput(d);
+  } else if (event === "done") {
+    appendOutput(`— 結束，exit code ${d.exit_code} —`, d.exit_code === 0 ? "meta" : "err");
+  } else if (event === "error") {
+    appendOutput(d, "err");
+  }
+}
+
+async function runAction(id, btn) {
+  // 用 fetch POST 讀 SSE（不用 EventSource：它只能 GET，而 GET 端點擋不住跨站觸發）
+  if (state.runAbort) state.runAbort.abort();
   document.querySelectorAll(".run.running").forEach(b => b.classList.remove("running"));
   btn.classList.add("running");
   const label = btn.childNodes[0].textContent.trim();
   $("output-title").textContent = `輸出 — ${label}`;
   $("output").innerHTML = "";
-  const es = new EventSource(`/api/actions/${id}/run`);
-  state.es = es;
-  const finish = () => { es.close(); state.es = null; btn.classList.remove("running"); refreshStatus(); };
-  es.addEventListener("start", e => {
-    const d = JSON.parse(e.data);
-    appendOutput(`$ ${d.cmd.join(" ")}`, "meta");
-    appendOutput(`  (cwd: ${d.cwd})`, "meta");
-  });
-  es.addEventListener("line", e => appendOutput(JSON.parse(e.data)));
-  es.addEventListener("done", e => {
-    const d = JSON.parse(e.data);
-    appendOutput(`— 結束，exit code ${d.exit_code} —`, d.exit_code === 0 ? "meta" : "err");
-    finish();
-  });
-  es.addEventListener("error", e => {
-    if (e.data) appendOutput(JSON.parse(e.data), "err");
-    else appendOutput("— 連線中斷 —", "err");
-    finish();
-  });
+  const ctrl = new AbortController();
+  state.runAbort = ctrl;
+  try {
+    const res = await fetch(`/api/actions/${id}/run`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: "{}", signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      appendOutput(`HTTP ${res.status}`, "err");
+    } else {
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let idx;
+        while ((idx = buf.indexOf("\n\n")) >= 0) {
+          handleRunEvent(buf.slice(0, idx));
+          buf = buf.slice(idx + 2);
+        }
+      }
+    }
+  } catch (e) {
+    if (e.name !== "AbortError") appendOutput(`— 連線中斷：${e.message} —`, "err");
+  }
+  if (state.runAbort === ctrl) state.runAbort = null;
+  btn.classList.remove("running");
+  refreshStatus();
 }
 
 /* ---------- 專案 dialog ---------- */
