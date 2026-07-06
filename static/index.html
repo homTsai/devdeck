@@ -161,7 +161,14 @@
 <!-- 動作 dialog -->
 <dialog id="action-dialog">
   <h3 id="action-dialog-title">新增動作</h3>
-  <label>腳本檔案 <select id="a-script"></select></label>
+  <div style="display:flex;gap:16px;margin-bottom:10px;color:var(--muted);font-size:13px">
+    動作類型：
+    <label style="margin:0"><input type="radio" name="a-type" value="script" checked> 腳本檔案</label>
+    <label style="margin:0"><input type="radio" name="a-type" value="command"> 直接指令</label>
+  </div>
+  <label id="a-script-row">腳本檔案 <select id="a-script"></select></label>
+  <label id="a-command-row" hidden>指令內容（於工作目錄以 shell 執行，專案 venv 已掛入 PATH）
+    <input id="a-command" placeholder="alembic upgrade head"></label>
   <label>顯示名稱 <input id="a-label" required></label>
   <label>分類（選填）<input id="a-category" list="category-list"><datalist id="category-list"></datalist></label>
   <label>關聯服務（常駐型腳本選這個，狀態燈會歸在該服務）<select id="a-service"></select></label>
@@ -206,6 +213,12 @@ async function loadProjects(selectId) {
   for (const p of state.projects) {
     const opt = document.createElement("option");
     opt.value = p.id; opt.textContent = p.name;
+    sel.appendChild(opt);
+  }
+  if (!state.projects.length) {
+    const opt = document.createElement("option");
+    opt.textContent = "（尚無專案）";
+    opt.disabled = true; opt.selected = true;
     sel.appendChild(opt);
   }
   const remembered = selectId ?? Number(localStorage.getItem("devdeck.project"));
@@ -295,7 +308,7 @@ function renderActions() {
       card.className = "action";
       card.innerHTML = `
         <button class="run" data-id="${a.id}">${esc(a.label)}
-          <span class="file">${esc(a.script_file)}</span></button>
+          <span class="file">${esc(a.script_file || "$ " + (a.command || ""))}</span></button>
         <span class="mgmt">
           <button class="edit" data-id="${a.id}">編輯</button>
         </span>`;
@@ -424,7 +437,7 @@ async function openActionDialog(actionId) {
   const a = actionId ? state.actions.find(x => x.id === actionId) : null;
   $("action-dialog-title").textContent = a ? "編輯動作" : "新增動作";
   try { state.scan = await api("GET", `/api/projects/${state.projectId}/scan`); }
-  catch (e) { return toast(e.message); }
+  catch { state.scan = []; }  // 掃描失敗（如腳本目錄不存在）仍可新增「直接指令」
 
   const sel = $("a-script");
   sel.innerHTML = "";
@@ -434,7 +447,11 @@ async function openActionDialog(actionId) {
     opt.value = s.file; opt.textContent = s.file;
     sel.appendChild(opt);
   }
-  if (!sel.options.length) return toast("腳本目錄內沒有可新增的腳本了");
+  if (!sel.options.length) {
+    const opt = document.createElement("option");
+    opt.value = ""; opt.textContent = "（無可新增的腳本）";
+    sel.appendChild(opt);
+  }
 
   const svcSel = $("a-service");
   svcSel.innerHTML = `<option value="">（無 — 一次性腳本）</option>`;
@@ -452,7 +469,9 @@ async function openActionDialog(actionId) {
     dl.appendChild(opt);
   }
 
-  sel.value = a ? a.script_file : sel.options[0].value;
+  sel.value = a?.script_file || sel.options[0].value;
+  setActionType(a?.command ? "command" : "script");
+  $("a-command").value = a?.command || "";
   $("a-label").value = a ? a.label : "";
   $("a-category").value = a?.category || "";
   svcSel.value = a?.service_id || "";
@@ -463,9 +482,20 @@ async function openActionDialog(actionId) {
   $("action-dialog").showModal();
 }
 
+function setActionType(t) {
+  document.querySelector(`input[name="a-type"][value="${t}"]`).checked = true;
+  $("a-script-row").hidden = t !== "script";
+  $("a-command-row").hidden = t !== "command";
+}
+document.querySelectorAll('input[name="a-type"]').forEach(r => {
+  r.onchange = () => setActionType(r.value);
+});
+
 async function saveAction() {
+  const type = document.querySelector('input[name="a-type"]:checked').value;
   const body = {
-    script_file: $("a-script").value,
+    script_file: type === "script" ? ($("a-script").value || null) : null,
+    command: type === "command" ? ($("a-command").value.trim() || null) : null,
     label: $("a-label").value.trim(),
     category: $("a-category").value.trim() || null,
     service_id: $("a-service").value ? Number($("a-service").value) : null,
@@ -473,6 +503,8 @@ async function saveAction() {
     sort_order: Number($("a-sort").value) || 0,
   };
   if (!body.label) return toast("顯示名稱必填");
+  if (type === "script" && !body.script_file) return toast("請選擇腳本檔案");
+  if (type === "command" && !body.command) return toast("指令內容必填");
   try {
     if (state.editingActionId) await api("PUT", `/api/actions/${state.editingActionId}`, body);
     else await api("POST", `/api/projects/${state.projectId}/actions`, body);

@@ -35,12 +35,17 @@ class ServiceIn(BaseModel):
 
 
 class ActionIn(BaseModel):
-    script_file: str
+    script_file: str | None = None
+    command: str | None = None
     label: str
     service_id: int | None = None
     workdir: str | None = None
     category: str | None = None
     sort_order: int = 0
+
+    def validate_source(self):
+        if bool(self.script_file) == bool(self.command):
+            raise HTTPException(400, "腳本檔案與直接指令必須擇一填寫")
 
 
 # ---------- helpers ----------
@@ -103,7 +108,9 @@ def scan_scripts(project_id: int):
     with db.get_conn() as conn:
         added = {
             r["script_file"]
-            for r in conn.execute("SELECT script_file FROM actions WHERE project_id=?", (project_id,))
+            for r in conn.execute(
+                "SELECT script_file FROM actions WHERE project_id=? AND script_file IS NOT NULL",
+                (project_id,))
         }
     files = sorted(
         p.name for p in scripts_dir.iterdir()
@@ -185,11 +192,12 @@ def list_actions(project_id: int):
 @app.post("/api/projects/{project_id}/actions")
 def create_action(project_id: int, body: ActionIn):
     get_project(project_id)
+    body.validate_source()
     with db.get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO actions (project_id, service_id, script_file, label, workdir, category, sort_order)"
-            " VALUES (?,?,?,?,?,?,?)",
-            (project_id, body.service_id, body.script_file, body.label,
+            "INSERT INTO actions (project_id, service_id, script_file, command, label, workdir, category, sort_order)"
+            " VALUES (?,?,?,?,?,?,?,?)",
+            (project_id, body.service_id, body.script_file, body.command, body.label,
              body.workdir, body.category, body.sort_order),
         )
         return {"id": cur.lastrowid}
@@ -197,11 +205,12 @@ def create_action(project_id: int, body: ActionIn):
 
 @app.put("/api/actions/{action_id}")
 def update_action(action_id: int, body: ActionIn):
+    body.validate_source()
     with db.get_conn() as conn:
         cur = conn.execute(
-            "UPDATE actions SET service_id=?, script_file=?, label=?, workdir=?, category=?, sort_order=?"
+            "UPDATE actions SET service_id=?, script_file=?, command=?, label=?, workdir=?, category=?, sort_order=?"
             " WHERE id=?",
-            (body.service_id, body.script_file, body.label, body.workdir,
+            (body.service_id, body.script_file, body.command, body.label, body.workdir,
              body.category, body.sort_order, action_id),
         )
         if cur.rowcount == 0:
@@ -233,19 +242,24 @@ async def run_action(action_id: int):
         return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
     async def event_stream():
-        script_path = Path(project["path"]) / project["scripts_dir"] / action["script_file"]
-        if not script_path.is_file():
-            yield ev("error", f"腳本不存在：{script_path}")
-            return
+        env = None
         try:
-            cmd = runner.resolve_command(script_path, project)
+            if action["command"]:
+                cmd = runner.resolve_shell_command(action["command"])
+                env = runner.venv_env(project)
+            else:
+                script_path = Path(project["path"]) / project["scripts_dir"] / action["script_file"]
+                if not script_path.is_file():
+                    yield ev("error", f"腳本不存在：{script_path}")
+                    return
+                cmd = runner.resolve_command(script_path, project)
         except runner.RunError as e:
             yield ev("error", str(e))
             return
         cwd = action["workdir"] or project["path"]
         yield ev("start", {"cmd": cmd, "cwd": cwd})
         try:
-            async for kind, payload in runner.stream_run(cmd, cwd):
+            async for kind, payload in runner.stream_run(cmd, cwd, env):
                 if kind == "line":
                     yield ev("line", payload)
                 else:
