@@ -5,15 +5,26 @@
 
 ## 啟動與關閉
 
+Windows：
+
 ```powershell
 .\start-devdeck.ps1      # 啟動（背景執行、無視窗）並開啟瀏覽器
 .\create-shortcut.ps1    # 建立開始功能表捷徑（執行一次即可）
 ```
 
+macOS / Linux：
+
+```bash
+./start-devdeck.sh       # 同上；macOS 也可在 Finder 雙擊 devdeck.command（可拖到 Dock）
+```
+
 首次執行會自動建立 `.venv` 並安裝相依套件，之後開啟 <http://127.0.0.1:7999>。
 伺服器在背景執行、不顯示視窗；若已在執行，再次啟動只會開啟瀏覽器。
 
-建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘選到開始畫面」或「釘選到工作列」。
+Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘選到開始畫面」或「釘選到工作列」。
+
+注意：設定資料（`devdeck.db`）每台機器各自一份，換機器後需重新登記專案與動作；
+`.ps1` 腳本在 macOS 需另裝 pwsh 才能執行，建議在 Mac 上改用 `.sh`/`.py` 腳本或指令型動作。
 
 關閉：面板右上角「關閉工具」按鈕會停止 devdeck 伺服器（不影響已啟動的專案服務）。
 
