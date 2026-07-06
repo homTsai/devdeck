@@ -46,6 +46,9 @@
   .light.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
   .light.off { background: var(--red); }
   .svc small { color: var(--muted); }
+  .svc-open { color: var(--accent); text-decoration: none; font-size: 12px; margin-left: 2px; }
+  .svc-open:hover { text-decoration: underline; }
+  .svc-open.dim { opacity: .45; }
 
   /* 動作按鈕 */
   .category { margin-bottom: 20px; }
@@ -98,6 +101,7 @@
     background: var(--panel); color: var(--text);
     border: 1px solid var(--border); border-radius: 10px; padding: 20px; min-width: 420px;
   }
+  #project-dialog { min-width: 640px; }
   dialog::backdrop { background: rgba(0,0,0,.5); }
   dialog h3 { margin: 0 0 14px; font-size: 15px; }
   dialog label { display: block; margin-bottom: 10px; color: var(--muted); font-size: 13px; }
@@ -148,7 +152,8 @@
       <thead><tr>
         <td style="color:var(--muted)">名稱</td>
         <td style="color:var(--muted)">port</td>
-        <td style="color:var(--muted)">PID 檔（選填）</td><td></td>
+        <td style="color:var(--muted)">PID 檔（選填）</td>
+        <td style="color:var(--muted)">網址（選填，有填才顯示「開啟」）</td><td></td>
       </tr></thead>
       <tbody id="svc-rows"></tbody>
     </table>
@@ -275,8 +280,11 @@ async function refreshStatus() {
     const light = s.listening ? "on" : "off";
     let extra = s.listening ? "運行中" : "已停止";
     if (s.pid != null) extra += s.pid_alive ? `（PID ${s.pid}）` : `（PID 檔殘留）`;
+    const open = s.url
+      ? `<a class="svc-open ${s.listening ? "" : "dim"}" href="${esc(s.url)}" target="_blank">開啟 ↗</a>`
+      : "";
     div.innerHTML = `<span class="light ${light}"></span><b>${esc(s.name)}</b>
-      <small>:${s.port} ${esc(extra)}</small>`;
+      <small>:${s.port} ${esc(extra)}</small>${open}`;
     box.appendChild(div);
   }
 }
@@ -393,6 +401,7 @@ function svcRow(s = {}) {
     <td><input class="s-name" value="${esc(s.name || "")}" placeholder="fastapi"></td>
     <td><input class="s-port" type="number" value="${s.port ?? ""}" placeholder="8000" style="width:80px"></td>
     <td><input class="s-pid" value="${esc(s.pid_file || "")}" placeholder="uvicorn.pid"></td>
+    <td><input class="s-url" value="${esc(s.url || "")}" placeholder="http://localhost:8000"></td>
     <td><button class="danger s-del" style="font-size:12px">刪</button></td>`;
   tr.querySelector(".s-del").onclick = async () => {
     if (s.id) {
@@ -439,6 +448,7 @@ async function saveProject() {
           name: tr.querySelector(".s-name").value.trim(),
           port: Number(tr.querySelector(".s-port").value),
           pid_file: tr.querySelector(".s-pid").value.trim() || null,
+          url: tr.querySelector(".s-url").value.trim() || null,
         };
         if (!svc.name || !svc.port) continue;
         if (tr.dataset.id) await api("PUT", `/api/services/${tr.dataset.id}`, svc);

@@ -36,6 +36,7 @@ class ServiceIn(BaseModel):
     name: str
     port: int
     pid_file: str | None = None
+    url: str | None = None
 
 
 class ActionServiceLink(BaseModel):
@@ -143,8 +144,8 @@ def create_service(project_id: int, body: ServiceIn):
     get_project(project_id)
     with db.get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO services (project_id, name, port, pid_file) VALUES (?,?,?,?)",
-            (project_id, body.name, body.port, body.pid_file),
+            "INSERT INTO services (project_id, name, port, pid_file, url) VALUES (?,?,?,?,?)",
+            (project_id, body.name, body.port, body.pid_file, body.url),
         )
         return {"id": cur.lastrowid}
 
@@ -153,8 +154,8 @@ def create_service(project_id: int, body: ServiceIn):
 def update_service(service_id: int, body: ServiceIn):
     with db.get_conn() as conn:
         cur = conn.execute(
-            "UPDATE services SET name=?, port=?, pid_file=? WHERE id=?",
-            (body.name, body.port, body.pid_file, service_id),
+            "UPDATE services SET name=?, port=?, pid_file=?, url=? WHERE id=?",
+            (body.name, body.port, body.pid_file, body.url, service_id),
         )
         if cur.rowcount == 0:
             raise HTTPException(404, "找不到服務")

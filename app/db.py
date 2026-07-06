@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS services (
     project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     name       TEXT NOT NULL,
     port       INTEGER NOT NULL,
-    pid_file   TEXT
+    pid_file   TEXT,
+    url        TEXT                -- 選填：有值時狀態列顯示「開啟」連結
 );
 CREATE TABLE IF NOT EXISTS actions (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -114,6 +115,11 @@ def _migrate():
         # v2 → v3：移除 service_id，關聯改由 action_services 多對多承載（舊關聯不轉換）
         if "service_id" in cols:
             conn.executescript(MIGRATE_DROP_SERVICE_ID)
+            conn.commit()
+        # v3 → v4：services 加 url 欄位
+        svc_cols = {r[1] for r in conn.execute("PRAGMA table_info(services)")}
+        if svc_cols and "url" not in svc_cols:
+            conn.execute("ALTER TABLE services ADD COLUMN url TEXT")
             conn.commit()
     finally:
         conn.close()
