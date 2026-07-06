@@ -3,3 +3,10 @@ __pycache__/
 .venv/
 *.db
 devdeck.token
+
+.env
+.env.local
+.DS_Store           # macOS
+*.egg-info/
+dist/
+build/
