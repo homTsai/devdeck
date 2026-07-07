@@ -21,8 +21,14 @@ Windows：
 macOS / Linux：
 
 ```bash
-./start-devdeck.sh       # 同上；macOS 也可在 Finder 雙擊 devdeck.command（可拖到 Dock）
+./start-devdeck.sh          # 啟動（背景執行、無視窗）並開啟瀏覽器
+./create-mac-launcher.sh    # （macOS）生成 devdeck.app 到 ~/Applications，執行一次即可
 ```
+
+macOS 推薦跑一次 `create-mac-launcher.sh` 生成 **devdeck.app**（對應 Windows 的
+`create-shortcut.ps1`）：之後可在 Spotlight / Launchpad 搜尋 devdeck、或拖到 Dock，
+雙擊即啟動、不閃 Terminal 視窗。因為 app 是在本機生成、不帶 clone 來的隔離標記，
+**不會觸發 Gatekeeper 封鎖**（詳見下方說明）。
 
 首次執行會自動建立 `.venv` 並安裝相依套件，之後開啟 <http://127.0.0.1:7999>。
 伺服器在背景執行、不顯示視窗；若已在執行，再次啟動只會開啟瀏覽器。
@@ -41,8 +47,12 @@ Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘
 
 雙擊入口是 **`devdeck.command`**（不是 `.sh`——Finder 雙擊 `.sh` 只會用關聯的編輯器打開、不會執行）。
 
-若雙擊 `devdeck.command` 出現「Apple 無法驗證是否為惡意軟體」，且對話框只給「完成 / 丟到垃圾桶」，
-表示檔案被加上了隔離標記（常見於用 Sourcetree 等 GUI 工具 clone）。三選一即可解除：
+**最省事的做法：跑 `./create-mac-launcher.sh` 改用生成的 `devdeck.app`** —— 它在本機生成、
+不帶隔離標記，Gatekeeper 完全不會攔。
+
+若仍想用 `devdeck.command`，而雙擊時出現「Apple 無法驗證是否為惡意軟體」、對話框只給
+「完成 / 丟到垃圾桶」，表示檔案被加上了隔離標記（常見於用 Sourcetree 等 GUI 工具 clone）。
+三選一即可解除：
 
 - 終端機清除隔離標記：`xattr -d com.apple.quarantine devdeck.command`（或整包 `xattr -cr .`）；
 - 系統設定 → 隱私權與安全性 → 往下找到「仍要打開」放行；
@@ -122,8 +132,15 @@ Windows:
 macOS / Linux:
 
 ```bash
-./start-devdeck.sh       # same; on macOS you can also double-click devdeck.command (dock-able)
+./start-devdeck.sh          # start in the background (no window) and open the browser
+./create-mac-launcher.sh    # (macOS) generate devdeck.app into ~/Applications (run once)
 ```
+
+On macOS, run `create-mac-launcher.sh` once to generate **devdeck.app** (the counterpart of
+Windows' `create-shortcut.ps1`): afterwards you can find devdeck in Spotlight / Launchpad or
+drag it to the Dock, and double-click to launch with no Terminal window. Because the app is
+generated locally — with no quarantine flag from cloning — it **does not trip Gatekeeper**
+(see below).
 
 The first run creates `.venv` and installs dependencies, then opens <http://127.0.0.1:7999>.
 The server runs in the background with no console window; if it is already running, launching
@@ -148,9 +165,12 @@ launch devdeck from its shortcut again.
 The double-click entry point is **`devdeck.command`** (not `.sh` — double-clicking a `.sh` in
 Finder only opens it in the associated editor, it does not run it).
 
-If double-clicking `devdeck.command` shows "Apple could not verify … is free of malware" with
-only "Done / Move to Trash", the file carries a quarantine flag (common when cloned via a GUI
-tool such as Sourcetree). Clear it any one of three ways:
+**Easiest fix: run `./create-mac-launcher.sh` and use the generated `devdeck.app` instead** —
+it is generated locally, carries no quarantine flag, and never trips Gatekeeper.
+
+If you still prefer `devdeck.command` and double-clicking shows "Apple could not verify … is
+free of malware" with only "Done / Move to Trash", the file carries a quarantine flag (common
+when cloned via a GUI tool such as Sourcetree). Clear it any one of three ways:
 
 - Remove the flag in a terminal: `xattr -d com.apple.quarantine devdeck.command`
   (or `xattr -cr .` for the whole repo);
