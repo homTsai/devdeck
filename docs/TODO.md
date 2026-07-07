@@ -9,13 +9,13 @@
 | # | 項目 | 優先度 | 現況 | 具體動作 |
 |---|------|--------|------|----------|
 | 1 | requirements.txt 版本鎖定 | 🔴 高 | ✅ 已完成 | 已改為 `fastapi>=0.104.0`、`uvicorn>=0.24.0` |
-| 2 | README 補 **Requirements** 段 | 🟡 中 | 待辦 | 標明 Python 3.10+、各 OS 最低版本、`pwsh`（macOS 可選） |
+| 2 | README 補 **Requirements** 段 | 🟡 中 | 待辦 | 標明 Python 3.10+、支援範圍（**官方支援 Windows + macOS；Linux 未測試、非官方支援**）、`pwsh`（macOS 可選） |
 | 3 | README 補 **Troubleshooting** 段 | 🟡 中 | 待辦 | 收錄「找不到 python/node/bash」「port 被占用 → `DEVDECK_PORT`」「macOS 無法雙擊 .command → 權限」 |
 | 4 | 錯誤訊息友善化 | 🟡 中 | 待辦 | `app/runner.py` 訊息附「怎麼解決」提示 + 指向 README Troubleshooting 錨點 |
-| 5 | 跨平台實測 | 🟡 中 | 🔸 部分完成 | macOS 已實測並修正（commits `0984f71`、`ef878d5`、`3491e00`）；**剩 Linux `xdg-open` 待測** |
+| 5 | 跨平台實測 | 🟡 中 | ✅ 完成 | macOS 已實測並修正（commits `0984f71`、`ef878d5`、`3491e00`）；Windows 為主要使用平台；**Linux 非官方支援、不列入實測**（見備註） |
 | 6 | CHANGELOG | 🟢 低 | 待辦 | 有版本規劃再建，先擺著 |
 | 7 | 前端 i18n（英文語系） | 🟡 中 | 待辦 | **純前端**：`navigator.language` 首載偵測 + 頁首手動切換 + `localStorage` 記憶；詳範圍見下方「i18n 範圍界定」 |
-| 8 | 動作「外部終端機啟動」勾選（`in_terminal`） | 🟡 中 | 待辦 | 前端加勾選、後端依平台轉換啟動指令；詳見下方「服務生命週期相關」 |
+| 8 | 動作「外部終端機啟動」勾選（`in_terminal`） | 🟡 中 | 待辦 | 前端加勾選、後端依平台轉換啟動指令（**只做 Windows + macOS**）；詳見下方「服務生命週期相關」 |
 | 9 | 動態 Port 偵測 + 動態健康檢查 | 🟡 中 | 待辦 | 用 PID 反查監聽中的 port，狀態探測由「設定檔固定值」改「動態捕捉值」；詳見下方「服務生命週期相關」 |
 
 ## 備註
@@ -23,6 +23,7 @@
 - **第 4、5 項綁在一起**：`.command` / `.sh` 的權限、`create-mac-launcher.sh` 的行為，實測後才知道錯誤訊息該補什麼，建議一起做。
 - **第 6 項（CHANGELOG）現在投報率低**：單人／早期工具，等真的要對外發版再建即可，已降到低優先。
 - **第 3 項（Troubleshooting）補一則 cloudflared 關閉 know-how**：關閉動作的指令要不要加 `-Force`——見下方「服務生命週期相關」的說明，寫 Troubleshooting 時一併收錄。
+- **Linux 支援政策（2026-07 決定）**：不為 Linux 桌面專門投入開發——不做 Linux 版 launcher、不做 `in_terminal` 的終端機 matrix、不測 `xdg-open` 跨發行版。現有 POSIX / XDG 碼（約 5 行，與 macOS 共用）保留為 best-effort，壞了不修，**不刪碼**（刪了會誤傷 macOS）。定位：**官方支援 Windows + macOS；Linux 非官方支援、未測試、不保證**。理由：個人工具，Linux 桌面族群慣用終端機、非受眾，且環境過於分歧。
 
 ## i18n 範圍界定（第 7 項）
 
@@ -53,7 +54,7 @@ Copilot 原提案是「通用 Web App」規格，套到本機單人工具過度�
 
 - 前端：動作設定新增 `in_terminal` 勾選方塊。
 - 後端：依平台轉換啟動指令 —— Windows `cmd /c start`、macOS `osascript`（彈新視窗）。
-- ⚠️ **Linux 是坑**：終端機百百種（`gnome-terminal` / `konsole` / `xterm` / `x-terminal-emulator`…），得偵測或讓使用者設定，別寫死。
+- **Linux 不特別處理**：終端機百家爭鳴（`gnome-terminal` / `konsole` / `xterm`…），依「不為 Linux 專門投入」政策略過（見備註）；Linux 使用者本就慣用終端機，可自行下指令。
 - **附帶好處**：這也是 cloudflared「優雅關閉」在 Windows 上最實際的解——開在外部終端機直接 Ctrl-C，tunnel 自然 drain（見下方 ② know-how）。
 
 ### 第 9 項：動態 Port 偵測 + 動態健康檢查
