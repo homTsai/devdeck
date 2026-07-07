@@ -37,6 +37,17 @@ Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘
 
 若頁面顯示「驗證失效」（例如清除過瀏覽器資料），重新點一次啟動捷徑即可重新取得授權。
 
+### macOS：雙擊被 Gatekeeper 擋住怎麼辦
+
+雙擊入口是 **`devdeck.command`**（不是 `.sh`——Finder 雙擊 `.sh` 只會用關聯的編輯器打開、不會執行）。
+
+若雙擊 `devdeck.command` 出現「Apple 無法驗證是否為惡意軟體」，且對話框只給「完成 / 丟到垃圾桶」，
+表示檔案被加上了隔離標記（常見於用 Sourcetree 等 GUI 工具 clone）。三選一即可解除：
+
+- 終端機清除隔離標記：`xattr -d com.apple.quarantine devdeck.command`（或整包 `xattr -cr .`）；
+- 系統設定 → 隱私權與安全性 → 往下找到「仍要打開」放行；
+- 或直接在終端機執行 `./start-devdeck.sh`——終端機明確執行不受 Gatekeeper 管制。
+
 ### 使用流程
 
 1. **新增專案**：設定專案名稱、路徑、腳本目錄（預設 `scripts`）、venv 路徑（預設 `.venv`）。
@@ -131,6 +142,20 @@ touch any project services you started).
 
 If the page says the token is missing or invalid (e.g. after clearing browser data), simply
 launch devdeck from its shortcut again.
+
+### macOS: first launch blocked by Gatekeeper
+
+The double-click entry point is **`devdeck.command`** (not `.sh` — double-clicking a `.sh` in
+Finder only opens it in the associated editor, it does not run it).
+
+If double-clicking `devdeck.command` shows "Apple could not verify … is free of malware" with
+only "Done / Move to Trash", the file carries a quarantine flag (common when cloned via a GUI
+tool such as Sourcetree). Clear it any one of three ways:
+
+- Remove the flag in a terminal: `xattr -d com.apple.quarantine devdeck.command`
+  (or `xattr -cr .` for the whole repo);
+- System Settings → Privacy & Security → scroll down and click "Open Anyway";
+- Or just run `./start-devdeck.sh` in a terminal — explicit execution is not subject to Gatekeeper.
 
 ### Workflow
 
