@@ -83,10 +83,22 @@ async def stream_run(cmd: list[str], cwd: str, env: dict | None = None):
         raise RunError(f"無法啟動程序：{e}") from e
 
     assert proc.stdout is not None
-    while True:
-        line = await proc.stdout.readline()
-        if not line:
-            break
-        yield ("line", line.decode("utf-8", errors="replace").rstrip("\r\n"))
-    code = await proc.wait()
-    yield ("done", code)
+    try:
+        while True:
+            line = await proc.stdout.readline()
+            if not line:
+                break
+            yield ("line", line.decode("utf-8", errors="replace").rstrip("\r\n"))
+        code = await proc.wait()
+        yield ("done", code)
+    finally:
+        # SSE 客戶端斷線時，這個產生器會被提前關閉；別讓前景子行程變孤兒。
+        # 只終止直接子行程——腳本自己 nohup 出去的背景服務不受影響。
+        if proc.returncode is None:
+            try:
+                proc.terminate()
+                await asyncio.wait_for(proc.wait(), timeout=5)
+            except asyncio.TimeoutError:
+                proc.kill()
+            except ProcessLookupError:
+                pass

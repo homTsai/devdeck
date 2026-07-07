@@ -10,6 +10,16 @@ else
   DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/devdeck"
 fi
 
+# 從 Finder 雙擊（或 launchd）啟動時只會拿到精簡 PATH，動作子行程會找不到
+# nvm / Homebrew（含 Apple Silicon 的 /opt/homebrew/bin）裝的 node 等工具。
+# 先用登入 shell 解析出使用者的完整 PATH 再帶給背景伺服器，讓不論從終端機或
+# Finder 啟動都拿到一致的工具鏈。stdin 導向 /dev/null 避免 rc 讀輸入卡住。
+LOGIN_SHELL="${SHELL:-/bin/zsh}"
+FULL_PATH="$("$LOGIN_SHELL" -ilc 'printf %s "$PATH"' </dev/null 2>/dev/null || true)"
+if [ -n "$FULL_PATH" ]; then
+  export PATH="$FULL_PATH"
+fi
+
 if [ ! -x "$PYTHON" ]; then
   echo "首次啟動：建立 venv 並安裝相依套件..."
   python3 -m venv "$ROOT/.venv"
