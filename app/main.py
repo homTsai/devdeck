@@ -94,7 +94,7 @@ class ActionIn(BaseModel):
 
     def validate_source(self):
         if bool(self.script_file) == bool(self.command):
-            raise HTTPException(400, "腳本檔案與直接指令必須擇一填寫")
+            raise HTTPException(400, detail={"key": "err.scriptXorCommand"})
 
 
 # ---------- helpers ----------
@@ -103,7 +103,7 @@ def get_project(project_id: int) -> dict:
     with db.get_conn() as conn:
         row = conn.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
     if not row:
-        raise HTTPException(404, "找不到專案")
+        raise HTTPException(404, detail={"key": "err.projectNotFound"})
     return dict(row)
 
 
@@ -118,7 +118,7 @@ def list_projects():
 @app.post("/api/projects")
 def create_project(body: ProjectIn):
     if not Path(body.path).is_dir():
-        raise HTTPException(400, f"專案路徑不存在：{body.path}")
+        raise HTTPException(400, detail={"key": "err.projectPathMissing", "params": {"path": body.path}})
     with db.get_conn() as conn:
         cur = conn.execute(
             "INSERT INTO projects (name, path, scripts_dir, venv_path) VALUES (?,?,?,?)",
@@ -131,7 +131,7 @@ def create_project(body: ProjectIn):
 def update_project(project_id: int, body: ProjectIn):
     get_project(project_id)
     if not Path(body.path).is_dir():
-        raise HTTPException(400, f"專案路徑不存在：{body.path}")
+        raise HTTPException(400, detail={"key": "err.projectPathMissing", "params": {"path": body.path}})
     with db.get_conn() as conn:
         conn.execute(
             "UPDATE projects SET name=?, path=?, scripts_dir=?, venv_path=? WHERE id=?",
@@ -153,7 +153,7 @@ def scan_scripts(project_id: int):
     project = get_project(project_id)
     scripts_dir = Path(project["path"]) / project["scripts_dir"]
     if not scripts_dir.is_dir():
-        raise HTTPException(400, f"腳本目錄不存在：{scripts_dir}")
+        raise HTTPException(400, detail={"key": "err.scriptsDirMissing", "params": {"dir": str(scripts_dir)}})
     with db.get_conn() as conn:
         added = {
             r["script_file"]
@@ -197,7 +197,7 @@ def update_service(service_id: int, body: ServiceIn):
             (body.name, body.port, body.pid_file, body.url, service_id),
         )
         if cur.rowcount == 0:
-            raise HTTPException(404, "找不到服務")
+            raise HTTPException(404, detail={"key": "err.serviceNotFound"})
     return {"ok": True}
 
 
@@ -206,7 +206,7 @@ def delete_service(service_id: int):
     with db.get_conn() as conn:
         cur = conn.execute("DELETE FROM services WHERE id=?", (service_id,))
         if cur.rowcount == 0:
-            raise HTTPException(404, "找不到服務")
+            raise HTTPException(404, detail={"key": "err.serviceNotFound"})
     return {"ok": True}
 
 
@@ -284,7 +284,7 @@ def update_action(action_id: int, body: ActionIn):
              body.category, body.sort_order, action_id),
         )
         if cur.rowcount == 0:
-            raise HTTPException(404, "找不到動作")
+            raise HTTPException(404, detail={"key": "err.actionNotFound"})
         _replace_links(conn, action_id, body.services)
     return {"ok": True}
 
@@ -294,7 +294,7 @@ def delete_action(action_id: int):
     with db.get_conn() as conn:
         cur = conn.execute("DELETE FROM actions WHERE id=?", (action_id,))
         if cur.rowcount == 0:
-            raise HTTPException(404, "找不到動作")
+            raise HTTPException(404, detail={"key": "err.actionNotFound"})
     return {"ok": True}
 
 
@@ -306,7 +306,7 @@ async def run_action(action_id: int, _body: dict = Body(default={})):
     with db.get_conn() as conn:
         action = conn.execute("SELECT * FROM actions WHERE id=?", (action_id,)).fetchone()
     if not action:
-        raise HTTPException(404, "找不到動作")
+        raise HTTPException(404, detail={"key": "err.actionNotFound"})
     action = dict(action)
     project = get_project(action["project_id"])
 
@@ -322,11 +322,11 @@ async def run_action(action_id: int, _body: dict = Body(default={})):
             else:
                 script_path = Path(project["path"]) / project["scripts_dir"] / action["script_file"]
                 if not script_path.is_file():
-                    yield ev("error", f"腳本不存在：{script_path}")
+                    yield ev("error", {"key": "err.scriptNotFound", "params": {"path": str(script_path)}})
                     return
                 cmd = runner.resolve_command(script_path, project)
         except runner.RunError as e:
-            yield ev("error", str(e))
+            yield ev("error", {"key": e.key, "params": e.params})
             return
         cwd = action["workdir"] or project["path"]
         yield ev("start", {"cmd": cmd, "cwd": cwd})
@@ -337,7 +337,7 @@ async def run_action(action_id: int, _body: dict = Body(default={})):
                 else:
                     yield ev("done", {"exit_code": payload})
         except runner.RunError as e:
-            yield ev("error", str(e))
+            yield ev("error", {"key": e.key, "params": e.params})
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 

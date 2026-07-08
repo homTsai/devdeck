@@ -8,7 +8,12 @@ from pathlib import Path
 
 
 class RunError(Exception):
-    pass
+    """執行前置錯誤：只帶 i18n error key 與參數；面向使用者的文字由前端依語系用 t() 組出。"""
+
+    def __init__(self, key: str, **params):
+        self.key = key
+        self.params = params
+        super().__init__(key)
 
 
 def _venv_python(project) -> Path:
@@ -23,26 +28,26 @@ def resolve_command(script_path: Path, project) -> list[str]:
     if ext == ".ps1":
         shell = shutil.which("pwsh") or shutil.which("powershell")
         if not shell:
-            raise RunError("找不到 pwsh / powershell——請安裝 PowerShell（macOS 需另裝 pwsh）並確認已在 PATH 上；解法詳見 README「疑難排解」。")
+            raise RunError("err.noPwsh")
         return [shell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script_path)]
     if ext == ".py":
         python = _venv_python(project)
         if not python.exists():
-            raise RunError(f"找不到專案 venv 的 python：{python}——請確認專案設定的 venv 路徑正確，或先在專案目錄建立 venv；解法詳見 README「疑難排解」。")
+            raise RunError("err.noVenvPython", python=str(python))
         return [str(python), str(script_path)]
     if ext in (".mjs", ".js"):
         node = shutil.which("node")
         if not node:
-            raise RunError("找不到 node——請安裝 Node.js 並確認 node 已在 PATH 上；macOS 從 Finder 啟動時 PATH 較精簡，解法詳見 README「疑難排解」。")
+            raise RunError("err.noNode")
         return [node, str(script_path)]
     if ext == ".sh":
         bash = shutil.which("bash")
         if not bash:
-            raise RunError("找不到 bash——請安裝 bash（Windows 可用 Git Bash）並確認已在 PATH 上；解法詳見 README「疑難排解」。")
+            raise RunError("err.noBash")
         return [bash, str(script_path)]
     if ext in (".cmd", ".bat"):
         return ["cmd", "/c", str(script_path)]
-    raise RunError(f"不支援的副檔名：{ext}")
+    raise RunError("err.unsupportedExt", ext=ext)
 
 
 def resolve_shell_command(command: str) -> list[str]:
@@ -50,11 +55,11 @@ def resolve_shell_command(command: str) -> list[str]:
     if sys.platform == "win32":
         shell = shutil.which("pwsh") or shutil.which("powershell")
         if not shell:
-            raise RunError("找不到 pwsh / powershell——請安裝 PowerShell（macOS 需另裝 pwsh）並確認已在 PATH 上；解法詳見 README「疑難排解」。")
+            raise RunError("err.noPwsh")
         return [shell, "-NoProfile", "-Command", command]
     bash = shutil.which("bash")
     if not bash:
-        raise RunError("找不到 bash——請安裝 bash（Windows 可用 Git Bash）並確認已在 PATH 上；解法詳見 README「疑難排解」。")
+        raise RunError("err.noBash")
     return [bash, "-lc", command]
 
 
@@ -80,7 +85,7 @@ async def stream_run(cmd: list[str], cwd: str, env: dict | None = None):
             stderr=asyncio.subprocess.STDOUT,
         )
     except OSError as e:
-        raise RunError(f"無法啟動程序：{e}") from e
+        raise RunError("err.spawnFailed", detail=str(e)) from e
 
     assert proc.stdout is not None
     try:

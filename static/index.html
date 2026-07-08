@@ -271,6 +271,20 @@ const I18N = {
     "shutdown.done": "devdeck 已關閉，此分頁可以關掉了。",
     "auth.lost": "驗證失效：請重新點一次 devdeck 啟動捷徑取得授權。",
     "auth.lostHint": "Token missing or invalid — launch devdeck from its shortcut/launcher again.",
+    /* 錯誤訊息（後端回 error key + 參數，前端依語系組訊息）*/
+    "err.noPwsh": "找不到 pwsh / powershell——請安裝 PowerShell（macOS 需另裝 pwsh）並確認已在 PATH 上；解法詳見 README「疑難排解」。",
+    "err.noVenvPython": "找不到專案 venv 的 python：{python}——請確認專案設定的 venv 路徑正確，或先在專案目錄建立 venv；解法詳見 README「疑難排解」。",
+    "err.noNode": "找不到 node——請安裝 Node.js 並確認 node 已在 PATH 上；macOS 從 Finder 啟動時 PATH 較精簡，解法詳見 README「疑難排解」。",
+    "err.noBash": "找不到 bash——請安裝 bash（Windows 可用 Git Bash）並確認已在 PATH 上；解法詳見 README「疑難排解」。",
+    "err.unsupportedExt": "不支援的副檔名：{ext}",
+    "err.spawnFailed": "無法啟動程序：{detail}",
+    "err.scriptNotFound": "腳本不存在：{path}",
+    "err.scriptXorCommand": "腳本檔案與直接指令必須擇一填寫",
+    "err.projectNotFound": "找不到專案",
+    "err.projectPathMissing": "專案路徑不存在：{path}",
+    "err.scriptsDirMissing": "腳本目錄不存在：{dir}",
+    "err.serviceNotFound": "找不到服務",
+    "err.actionNotFound": "找不到動作",
   },
   "en": {
     "header.addProject": "+ Add project",
@@ -339,6 +353,20 @@ const I18N = {
     "shutdown.done": "devdeck has shut down — you can close this tab.",
     "auth.lost": "Authentication lost: click the devdeck launcher shortcut again to re-authorize.",
     "auth.lostHint": "Token missing or invalid — launch devdeck from its shortcut/launcher again.",
+    /* 錯誤訊息（後端回 error key + 參數，前端依語系組訊息）*/
+    "err.noPwsh": "Cannot find pwsh / powershell — install PowerShell (on macOS install pwsh separately) and make sure it's on PATH; see the Troubleshooting section in the README.",
+    "err.noVenvPython": "Cannot find the project venv's python: {python} — check the project's configured venv path, or create a venv in the project folder first; see the Troubleshooting section in the README.",
+    "err.noNode": "Cannot find node — install Node.js and make sure node is on PATH; on macOS the PATH is leaner when launched from Finder — see the Troubleshooting section in the README.",
+    "err.noBash": "Cannot find bash — install bash (on Windows use Git Bash) and make sure it's on PATH; see the Troubleshooting section in the README.",
+    "err.unsupportedExt": "Unsupported file extension: {ext}",
+    "err.spawnFailed": "Failed to start the process: {detail}",
+    "err.scriptNotFound": "Script not found: {path}",
+    "err.scriptXorCommand": "Fill in either a script file or a direct command, not both.",
+    "err.projectNotFound": "Project not found",
+    "err.projectPathMissing": "Project path does not exist: {path}",
+    "err.scriptsDirMissing": "Scripts folder does not exist: {dir}",
+    "err.serviceNotFound": "Service not found",
+    "err.actionNotFound": "Action not found",
   },
 };
 let LANG = DEFAULT_LANG;
@@ -421,7 +449,12 @@ async function api(method, url, body) {
   if (res.status === 401) { authLost(); throw new Error("unauthorized"); }
   if (!res.ok) {
     let msg = res.statusText;
-    try { msg = (await res.json()).detail || msg; } catch {}
+    // detail 可能是 error key 物件（{key, params}）或純字串（相容協定層訊息）
+    try {
+      const detail = (await res.json()).detail;
+      if (detail && typeof detail === "object" && detail.key) msg = t(detail.key, detail.params);
+      else if (detail) msg = detail;
+    } catch {}
     throw new Error(msg);
   }
   return res.json();
@@ -596,7 +629,8 @@ function handleRunEvent(block) {
   } else if (event === "done") {
     appendOutput(t("run.done", { code: d.exit_code }), d.exit_code === 0 ? "meta" : "err");
   } else if (event === "error") {
-    appendOutput(d, "err");
+    // 後端回 error key（{key, params}）；由前端依語系組訊息。舊格式（純字串）仍相容。
+    appendOutput(typeof d === "string" ? d : t(d.key, d.params), "err");
   }
 }
 

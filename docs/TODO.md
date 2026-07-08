@@ -11,7 +11,7 @@
 | 1 | requirements.txt 版本鎖定 | 🔴 高 | ✅ 已完成 | 已改為 `fastapi>=0.104.0`、`uvicorn>=0.24.0` |
 | 2 | README 補 **Requirements** 段 | 🟡 中 | ✅ 已完成 | 已加 Requirements 段（繁中／英）：Python 3.10+、官方支援 Windows + macOS（Linux 非官方）、依腳本類型的 pwsh / node / bash / venv 需求 |
 | 3 | README 補 **Troubleshooting** 段 | 🟡 中 | ✅ 已完成 | 已加 Troubleshooting 段（繁中／英）：直譯器找不到、venv python 找不到、`DEVDECK_PORT`、macOS `.command` 權限、cloudflared `-Force` know-how |
-| 4 | 錯誤訊息友善化 | 🟡 中 | 4a ✅／4b 待辦（已解鎖） | **4a（已完成，commit `d521648`）**：`app/runner.py` 的 `RunError` 附「怎麼解決」繁中提示 + 一句「詳見 README 疑難排解」純文字；**4b（第 7 項 i18n 已完成，前端 `t()` 骨架已就緒可接手）**：若錯誤訊息要跟語系走，改後端回 error key、前端 `t()` 組訊息與語系錨點 |
+| 4 | 錯誤訊息友善化 | 🟡 中 | ✅ 已完成 | **4a（commit `d521648`）**：`app/runner.py` 的 `RunError` 附「怎麼解決」繁中提示；**4b（已完成）**：後端改回 error key——`RunError` 只帶 `{key, params}`、`HTTPException` detail 改結構化 `{key, params}`、run stream 的 SSE `error` 事件同步；前端 `handleRunEvent`／`api()` 用 `t(key, params)` 依語系組訊息（含插值、缺字 fallback、純字串相容），語系錨點指向 README「疑難排解／Troubleshooting」段 |
 | 5 | 跨平台實測 | 🟡 中 | ✅ 完成 | macOS 已實測並修正（commits `0984f71`、`ef878d5`、`3491e00`）；Windows 為主要使用平台；**Linux 非官方支援、不列入實測**（見備註） |
 | 6 | CHANGELOG | 🟢 低 | 待辦 | 有版本規劃再建，先擺著 |
 | 7 | 前端 i18n（英文語系） | 🟡 中 | ✅ 已完成 | **純前端**：字典（zh-TW／en）inline 進 `static/index.html`；`navigator.language` 首載偵測（存 `localStorage` 優先）＋頁首下拉手動切換＋同步 `<html lang>`；靜態外殼用 `data-i18n`／`data-i18n-title`，動態 render 穿 `t(key, vars)`（含插值與缺字 fallback 回 zh-TW）；切換即時重繪已渲染的動作清單與輸出標題 |
