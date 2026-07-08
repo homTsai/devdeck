@@ -11,7 +11,7 @@
 | 1 | requirements.txt 版本鎖定 | 🔴 高 | ✅ 已完成 | 已改為 `fastapi>=0.104.0`、`uvicorn>=0.24.0` |
 | 2 | README 補 **Requirements** 段 | 🟡 中 | ✅ 已完成 | 已加 Requirements 段（繁中／英）：Python 3.10+、官方支援 Windows + macOS（Linux 非官方）、依腳本類型的 pwsh / node / bash / venv 需求 |
 | 3 | README 補 **Troubleshooting** 段 | 🟡 中 | ✅ 已完成 | 已加 Troubleshooting 段（繁中／英）：直譯器找不到、venv python 找不到、`DEVDECK_PORT`、macOS `.command` 權限、cloudflared `-Force` know-how |
-| 4 | 錯誤訊息友善化 | 🟡 中 | 待辦 | `app/runner.py` 訊息附「怎麼解決」提示 + 指向 README Troubleshooting 錨點 |
+| 4 | 錯誤訊息友善化 | 🟡 中 | 進行中（拆兩半） | **4a（現做）**：`app/runner.py` 的 `RunError` 附「怎麼解決」繁中提示 + 一句「詳見 README 疑難排解」純文字；**4b（待第 7 項 i18n）**：若錯誤訊息要跟語系走，改後端回 error key、前端 `t()` 組訊息與語系錨點 |
 | 5 | 跨平台實測 | 🟡 中 | ✅ 完成 | macOS 已實測並修正（commits `0984f71`、`ef878d5`、`3491e00`）；Windows 為主要使用平台；**Linux 非官方支援、不列入實測**（見備註） |
 | 6 | CHANGELOG | 🟢 低 | 待辦 | 有版本規劃再建，先擺著 |
 | 7 | 前端 i18n（英文語系） | 🟡 中 | 待辦 | **純前端**：`navigator.language` 首載偵測 + 頁首手動切換 + `localStorage` 記憶；詳範圍見下方「i18n 範圍界定」 |
@@ -20,7 +20,7 @@
 
 ## 備註
 
-- **第 4、5 項綁在一起**：`.command` / `.sh` 的權限、`create-mac-launcher.sh` 的行為，實測後才知道錯誤訊息該補什麼，建議一起做。
+- **第 4 項拆兩半（2026-07 決定）**：4a 是後端繁中提示，與 i18n 零耦合、現在就做；4b（錯誤訊息本身英文化）才依賴第 7 項的前端 `t()` 骨架，屆時後端改回 error key、由前端組語系訊息與錨點。純文字 SSE log 放錨點無意義，故 4a 只附「詳見 README 疑難排解」文字、不碰錨點。第 5 項（macOS 實測）已完成，提示內容已可定案。
 - **第 6 項（CHANGELOG）現在投報率低**：單人／早期工具，等真的要對外發版再建即可，已降到低優先。
 - **第 3 項（Troubleshooting）補一則 cloudflared 關閉 know-how**：關閉動作的指令要不要加 `-Force`——見下方「服務生命週期相關」的說明，寫 Troubleshooting 時一併收錄。
 - **Linux 支援政策（2026-07 決定）**：不為 Linux 桌面專門投入開發——不做 Linux 版 launcher、不做 `in_terminal` 的終端機 matrix、不測 `xdg-open` 跨發行版。現有 POSIX / XDG 碼（約 5 行，與 macOS 共用）保留為 best-effort，壞了不修，**不刪碼**（刪了會誤傷 macOS）。定位：**官方支援 Windows + macOS；Linux 非官方支援、未測試、不保證**。理由：個人工具，Linux 桌面族群慣用終端機、非受眾，且環境過於分歧。
