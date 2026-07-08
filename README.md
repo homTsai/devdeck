@@ -112,6 +112,10 @@ Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘
   之後所有 API 呼叫以 `X-Devdeck-Token` header 驗證。token 只透過本機檔案發放，
   服務本身不提供任何線上取得 token 的端點。想輪替 token：關閉工具、刪除
   `devdeck.token`、重新啟動即可。
+- **直接指令動作會原封不動執行、不做任何過濾**——這是刻意的：這類動作的用途就是
+  跑你自己設定的整條 shell 指令。它的安全邊界是「只綁 `127.0.0.1` + 本機檔案發放的
+  token」，不是指令內容驗證；能寫入指令的人本來就已具備你的本機權限。請只加入你信任
+  的指令，不要把 devdeck 暴露到不受信任的環境。
 
 ### 支援的腳本副檔名
 
@@ -278,6 +282,11 @@ when cloned via a GUI tool such as Sourcetree). Clear it any one of three ways:
   `X-Devdeck-Token` header. The token is only ever issued through the local file — the service
   has no online endpoint to obtain one. To rotate: close the tool, delete `devdeck.token`,
   and start again.
+- **Direct-command actions run verbatim, with no filtering** — this is deliberate: the whole
+  point of such an action is to run the exact shell command you configured. Its security
+  boundary is "bound to `127.0.0.1` only + a token issued through a local file," not command
+  validation; anyone who can write a command already has your local privileges. Only add
+  commands you trust, and never expose devdeck to an untrusted environment.
 
 ### Supported script extensions
 
