@@ -118,12 +118,16 @@
 <header>
   <h1>devdeck</h1>
   <select id="project-select"></select>
-  <button id="btn-add-project">＋ 新增專案</button>
-  <button id="btn-edit-project" class="mgmt-only" hidden>編輯專案</button>
-  <button id="btn-add-action" hidden>＋ 新增動作</button>
+  <button id="btn-add-project" data-i18n="header.addProject">＋ 新增專案</button>
+  <button id="btn-edit-project" class="mgmt-only" hidden data-i18n="header.editProject">編輯專案</button>
+  <button id="btn-add-action" hidden data-i18n="header.addAction">＋ 新增動作</button>
   <span class="spacer"></span>
-  <label style="color:var(--muted)"><input type="checkbox" id="manage-toggle"> 管理模式</label>
-  <button id="btn-shutdown" title="停止 devdeck 伺服器" class="danger">關閉工具</button>
+  <select id="lang-select" title="Language / 語言">
+    <option value="zh-TW">中文</option>
+    <option value="en">English</option>
+  </select>
+  <label style="color:var(--muted)"><input type="checkbox" id="manage-toggle"> <span data-i18n="header.manageMode">管理模式</span></label>
+  <button id="btn-shutdown" data-i18n="header.shutdown" data-i18n-title="header.shutdownTitle" title="停止 devdeck 伺服器" class="danger">關閉工具</button>
 </header>
 
 <main>
@@ -134,7 +138,7 @@
   </div>
   <div id="output-panel">
     <div id="output-head"><span id="output-title">輸出</span><span class="spacer"></span>
-      <button id="btn-clear-output" style="font-size:12px;padding:2px 8px">清除</button></div>
+      <button id="btn-clear-output" data-i18n="output.clear" style="font-size:12px;padding:2px 8px">清除</button></div>
     <pre id="output"></pre>
   </div>
 </main>
@@ -142,28 +146,28 @@
 <!-- 專案 dialog -->
 <dialog id="project-dialog">
   <h3 id="project-dialog-title">新增專案</h3>
-  <label>專案名稱 <input id="p-name" required></label>
-  <label>專案路徑 <input id="p-path" placeholder="D:\git\web\myproject" required></label>
-  <label>腳本目錄（相對於專案路徑）<input id="p-scripts" value="scripts"></label>
-  <label>venv 路徑（相對於專案路徑）<input id="p-venv" value=".venv"></label>
+  <label><span data-i18n="proj.name">專案名稱</span> <input id="p-name" required></label>
+  <label><span data-i18n="proj.path">專案路徑</span> <input id="p-path" placeholder="D:\git\web\myproject" required></label>
+  <label><span data-i18n="proj.scriptsDir">腳本目錄（相對於專案路徑）</span><input id="p-scripts" value="scripts"></label>
+  <label><span data-i18n="proj.venv">venv 路徑（相對於專案路徑）</span><input id="p-venv" value=".venv"></label>
   <fieldset id="svc-fieldset" hidden>
-    <legend>服務（狀態監測）</legend>
+    <legend data-i18n="proj.svcLegend">服務（狀態監測）</legend>
     <table id="svc-table">
       <thead><tr>
-        <td style="color:var(--muted)">名稱</td>
-        <td style="color:var(--muted)">port</td>
-        <td style="color:var(--muted)">PID 檔（選填）</td>
-        <td style="color:var(--muted)" title="勾選後狀態列顯示「開啟」連結，開 http://localhost:port">開網頁</td><td></td>
+        <td style="color:var(--muted)" data-i18n="proj.colName">名稱</td>
+        <td style="color:var(--muted)" data-i18n="proj.colPort">port</td>
+        <td style="color:var(--muted)" data-i18n="proj.colPid">PID 檔（選填）</td>
+        <td style="color:var(--muted)" data-i18n="proj.colWeb" data-i18n-title="proj.colWebTitle" title="勾選後狀態列顯示「開啟」連結，開 http://localhost:port">開網頁</td><td></td>
       </tr></thead>
       <tbody id="svc-rows"></tbody>
     </table>
-    <button id="btn-add-svc" style="font-size:12px">＋ 加入服務</button>
+    <button id="btn-add-svc" data-i18n="proj.addSvc" style="font-size:12px">＋ 加入服務</button>
   </fieldset>
   <div class="btns">
-    <button id="btn-del-project" class="danger" hidden>刪除專案</button>
+    <button id="btn-del-project" class="danger" hidden data-i18n="proj.del">刪除專案</button>
     <span class="spacer"></span>
-    <button onclick="document.getElementById('project-dialog').close()">取消</button>
-    <button id="btn-save-project" class="primary">儲存</button>
+    <button onclick="document.getElementById('project-dialog').close()" data-i18n="common.cancel">取消</button>
+    <button id="btn-save-project" class="primary" data-i18n="common.save">儲存</button>
   </div>
 </dialog>
 
@@ -171,31 +175,216 @@
 <dialog id="action-dialog">
   <h3 id="action-dialog-title">新增動作</h3>
   <div style="display:flex;gap:16px;margin-bottom:10px;color:var(--muted);font-size:13px">
-    動作類型：
-    <label style="margin:0"><input type="radio" name="a-type" value="script" checked> 腳本檔案</label>
-    <label style="margin:0"><input type="radio" name="a-type" value="command"> 直接指令</label>
+    <span data-i18n="act.typeLabel">動作類型：</span>
+    <label style="margin:0"><input type="radio" name="a-type" value="script" checked> <span data-i18n="act.typeScript">腳本檔案</span></label>
+    <label style="margin:0"><input type="radio" name="a-type" value="command"> <span data-i18n="act.typeCommand">直接指令</span></label>
   </div>
-  <label id="a-script-row">腳本檔案 <select id="a-script"></select></label>
-  <label id="a-command-row" hidden>指令內容（於工作目錄以 shell 執行，專案 venv 已掛入 PATH）
+  <label id="a-script-row"><span data-i18n="act.scriptRow">腳本檔案</span> <select id="a-script"></select></label>
+  <label id="a-command-row" hidden><span data-i18n="act.commandRow">指令內容（於工作目錄以 shell 執行，專案 venv 已掛入 PATH）</span>
     <input id="a-command" placeholder="alembic upgrade head"></label>
-  <label>顯示名稱 <input id="a-label" required></label>
-  <label>分類（選填）<input id="a-category" list="category-list"><datalist id="category-list"></datalist></label>
+  <label><span data-i18n="act.displayName">顯示名稱</span> <input id="a-label" required></label>
+  <label><span data-i18n="act.category">分類（選填）</span><input id="a-category" list="category-list"><datalist id="category-list"></datalist></label>
   <fieldset style="margin:0 0 10px">
-    <legend>按鈕狀態關聯（勾選的條件「全部成立」時停用此按鈕）</legend>
+    <legend data-i18n="act.svcLegend">按鈕狀態關聯（勾選的條件「全部成立」時停用此按鈕）</legend>
     <div id="a-services"></div>
   </fieldset>
-  <label>工作目錄（選填，預設為專案路徑）<input id="a-workdir"></label>
-  <label>排序（數字小的在前）<input id="a-sort" type="number" value="0"></label>
+  <label><span data-i18n="act.workdir">工作目錄（選填，預設為專案路徑）</span><input id="a-workdir"></label>
+  <label><span data-i18n="act.sort">排序（數字小的在前）</span><input id="a-sort" type="number" value="0"></label>
   <div class="btns">
-    <button id="btn-del-action" class="danger" hidden>刪除動作</button>
+    <button id="btn-del-action" class="danger" hidden data-i18n="act.del">刪除動作</button>
     <span class="spacer"></span>
-    <button onclick="document.getElementById('action-dialog').close()">取消</button>
-    <button id="btn-save-action" class="primary">儲存</button>
+    <button onclick="document.getElementById('action-dialog').close()" data-i18n="common.cancel">取消</button>
+    <button id="btn-save-action" class="primary" data-i18n="common.save">儲存</button>
   </div>
 </dialog>
 
 <script>
 const $ = id => document.getElementById(id);
+
+/* ---------- i18n（純前端，字典直接 inline，避免首載未翻譯閃爍）---------- */
+const DEFAULT_LANG = "zh-TW";
+const I18N = {
+  "zh-TW": {
+    "header.addProject": "＋ 新增專案",
+    "header.editProject": "編輯專案",
+    "header.addAction": "＋ 新增動作",
+    "header.manageMode": "管理模式",
+    "header.shutdown": "關閉工具",
+    "header.shutdownTitle": "停止 devdeck 伺服器",
+    "output.title": "輸出",
+    "output.titleWith": "輸出 — {label}",
+    "output.clear": "清除",
+    "common.cancel": "取消",
+    "common.save": "儲存",
+    "common.edit": "編輯",
+    "common.delete": "刪",
+    "proj.addTitle": "新增專案",
+    "proj.editTitle": "編輯專案",
+    "proj.name": "專案名稱",
+    "proj.path": "專案路徑",
+    "proj.scriptsDir": "腳本目錄（相對於專案路徑）",
+    "proj.venv": "venv 路徑（相對於專案路徑）",
+    "proj.svcLegend": "服務（狀態監測）",
+    "proj.colName": "名稱",
+    "proj.colPort": "port",
+    "proj.colPid": "PID 檔（選填）",
+    "proj.colWeb": "開網頁",
+    "proj.colWebTitle": "勾選後狀態列顯示「開啟」連結，開 http://localhost:port",
+    "proj.addSvc": "＋ 加入服務",
+    "proj.del": "刪除專案",
+    "act.addTitle": "新增動作",
+    "act.editTitle": "編輯動作",
+    "act.typeLabel": "動作類型：",
+    "act.typeScript": "腳本檔案",
+    "act.typeCommand": "直接指令",
+    "act.scriptRow": "腳本檔案",
+    "act.commandRow": "指令內容（於工作目錄以 shell 執行，專案 venv 已掛入 PATH）",
+    "act.displayName": "顯示名稱",
+    "act.category": "分類（選填）",
+    "act.svcLegend": "按鈕狀態關聯（勾選的條件「全部成立」時停用此按鈕）",
+    "act.workdir": "工作目錄（選填，預設為專案路徑）",
+    "act.sort": "排序（數字小的在前）",
+    "act.del": "刪除動作",
+    "act.noScript": "（無可新增的腳本）",
+    "act.noServices": "此專案尚未設定服務（在「編輯專案」中加入）",
+    "act.whenRunning": "運行中時停用",
+    "act.whenStopped": "停止時停用",
+    "empty.noProject": "還沒有專案，按「＋ 新增專案」開始。",
+    "empty.noProjectOption": "（尚無專案）",
+    "empty.noAction": "此專案還沒有動作，按「＋ 新增動作」從腳本目錄挑選。",
+    "cat.uncategorized": "未分類",
+    "svc.running": "運行中",
+    "svc.stopped": "已停止",
+    "svc.pid": "（PID {pid}）",
+    "svc.pidStale": "（PID 檔殘留）",
+    "svc.open": "開啟 ↗",
+    "run.done": "— 結束，exit code {code} —",
+    "run.aborted": "— 連線中斷：{msg} —",
+    "toast.nameReq": "名稱與路徑必填",
+    "toast.labelReq": "顯示名稱必填",
+    "toast.scriptReq": "請選擇腳本檔案",
+    "toast.commandReq": "指令內容必填",
+    "confirm.delSvc": "刪除服務「{name}」？",
+    "confirm.delProject": "刪除專案「{name}」及其所有動作設定？（不會動到專案檔案本身）",
+    "confirm.delAction": "刪除動作「{label}」？",
+    "confirm.shutdown": "關閉 devdeck 伺服器？（不影響已啟動的專案服務）",
+    "shutdown.done": "devdeck 已關閉，此分頁可以關掉了。",
+    "auth.lost": "驗證失效：請重新點一次 devdeck 啟動捷徑取得授權。",
+    "auth.lostHint": "Token missing or invalid — launch devdeck from its shortcut/launcher again.",
+  },
+  "en": {
+    "header.addProject": "+ Add project",
+    "header.editProject": "Edit project",
+    "header.addAction": "+ Add action",
+    "header.manageMode": "Manage mode",
+    "header.shutdown": "Shut down",
+    "header.shutdownTitle": "Stop the devdeck server",
+    "output.title": "Output",
+    "output.titleWith": "Output — {label}",
+    "output.clear": "Clear",
+    "common.cancel": "Cancel",
+    "common.save": "Save",
+    "common.edit": "Edit",
+    "common.delete": "Del",
+    "proj.addTitle": "Add project",
+    "proj.editTitle": "Edit project",
+    "proj.name": "Project name",
+    "proj.path": "Project path",
+    "proj.scriptsDir": "Scripts folder (relative to project path)",
+    "proj.venv": "venv path (relative to project path)",
+    "proj.svcLegend": "Services (status monitoring)",
+    "proj.colName": "Name",
+    "proj.colPort": "port",
+    "proj.colPid": "PID file (optional)",
+    "proj.colWeb": "Open web",
+    "proj.colWebTitle": 'When checked, the status bar shows an "Open" link to http://localhost:port',
+    "proj.addSvc": "+ Add service",
+    "proj.del": "Delete project",
+    "act.addTitle": "Add action",
+    "act.editTitle": "Edit action",
+    "act.typeLabel": "Action type:",
+    "act.typeScript": "Script file",
+    "act.typeCommand": "Direct command",
+    "act.scriptRow": "Script file",
+    "act.commandRow": "Command (runs in the working directory via shell; the project venv is on PATH)",
+    "act.displayName": "Display name",
+    "act.category": "Category (optional)",
+    "act.svcLegend": "Button-state links (disable this button when all checked conditions hold)",
+    "act.workdir": "Working directory (optional, defaults to project path)",
+    "act.sort": "Sort order (smaller numbers first)",
+    "act.del": "Delete action",
+    "act.noScript": "(No scripts available to add)",
+    "act.noServices": 'This project has no services yet (add them in "Edit project").',
+    "act.whenRunning": "Disable when running",
+    "act.whenStopped": "Disable when stopped",
+    "empty.noProject": 'No projects yet — click "+ Add project" to start.',
+    "empty.noProjectOption": "(No projects yet)",
+    "empty.noAction": 'No actions yet — click "+ Add action" to pick from the scripts folder.',
+    "cat.uncategorized": "Uncategorized",
+    "svc.running": "Running",
+    "svc.stopped": "Stopped",
+    "svc.pid": "(PID {pid})",
+    "svc.pidStale": "(stale PID file)",
+    "svc.open": "Open ↗",
+    "run.done": "— Finished, exit code {code} —",
+    "run.aborted": "— Connection lost: {msg} —",
+    "toast.nameReq": "Name and path are required",
+    "toast.labelReq": "Display name is required",
+    "toast.scriptReq": "Please choose a script file",
+    "toast.commandReq": "Command is required",
+    "confirm.delSvc": 'Delete service "{name}"?',
+    "confirm.delProject": 'Delete project "{name}" and all its action settings? (Project files are left untouched.)',
+    "confirm.delAction": 'Delete action "{label}"?',
+    "confirm.shutdown": "Shut down the devdeck server? (Running project services are unaffected.)",
+    "shutdown.done": "devdeck has shut down — you can close this tab.",
+    "auth.lost": "Authentication lost: click the devdeck launcher shortcut again to re-authorize.",
+    "auth.lostHint": "Token missing or invalid — launch devdeck from its shortcut/launcher again.",
+  },
+};
+let LANG = DEFAULT_LANG;
+
+function detectLang() {
+  const saved = localStorage.getItem("devdeck.lang");
+  if (saved && I18N[saved]) return saved;
+  const nav = ((navigator.languages && navigator.languages[0]) || navigator.language || "").toLowerCase();
+  if (nav.startsWith("en")) return "en";
+  if (nav.startsWith("zh")) return "zh-TW";
+  return DEFAULT_LANG;
+}
+
+function t(key, vars) {
+  const table = I18N[LANG] || I18N[DEFAULT_LANG];
+  let s = table[key] != null ? table[key]
+        : (I18N[DEFAULT_LANG][key] != null ? I18N[DEFAULT_LANG][key] : key);
+  if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] != null ? vars[k] : m));
+  return s;
+}
+
+function applyStaticI18n(root = document) {
+  root.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+  root.querySelectorAll("[data-i18n-title]").forEach(el => { el.title = t(el.dataset.i18nTitle); });
+  root.querySelectorAll("[data-i18n-placeholder]").forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+}
+
+function renderOutputTitle() {
+  $("output-title").textContent = state.outputLabel
+    ? t("output.titleWith", { label: state.outputLabel })
+    : t("output.title");
+}
+
+// 切換語系：立即生效、記憶到 localStorage、同步 <html lang>，並重繪動態 render 的區塊
+function setLang(lang) {
+  LANG = I18N[lang] ? lang : DEFAULT_LANG;
+  localStorage.setItem("devdeck.lang", LANG);
+  document.documentElement.lang = LANG === "en" ? "en" : "zh-Hant";
+  const ls = $("lang-select");
+  if (ls) ls.value = LANG;
+  applyStaticI18n();
+  renderOutputTitle();
+  renderProjectSelect();
+  if (state.projectId) { renderActions(); refreshStatus(); }
+  else { $("empty").textContent = t("empty.noProject"); }
+}
 
 // token 由啟動腳本帶在 ?token=，收下存 localStorage 後立刻從網址列清掉
 {
@@ -210,13 +399,14 @@ const TOKEN = () => localStorage.getItem("devdeck.token") || "";
 function authLost() {
   clearInterval(state.statusTimer);
   document.body.innerHTML = `<div class="empty" style="margin-top:80px">
-    驗證失效：請重新點一次 devdeck 啟動捷徑取得授權。<br>
-    <small>Token missing or invalid — launch devdeck from its shortcut/launcher again.</small></div>`;
+    ${t("auth.lost")}<br>
+    <small>${t("auth.lostHint")}</small></div>`;
 }
 const state = {
   projects: [], projectId: null, services: [], actions: [], scan: [],
   status: new Map(),  // service_id -> listening(bool)
   editingActionId: null, editingProject: false, statusTimer: null, runAbort: null,
+  outputLabel: null,  // 目前輸出面板顯示的動作名稱（供語系切換時重繪標題）
 };
 
 async function api(method, url, body) {
@@ -242,6 +432,13 @@ const toast = msg => alert(msg);
 
 async function loadProjects(selectId) {
   state.projects = await api("GET", "/api/projects");
+  renderProjectSelect();
+  const remembered = selectId ?? Number(localStorage.getItem("devdeck.project"));
+  const target = state.projects.find(p => p.id === remembered) || state.projects[0];
+  await selectProject(target ? target.id : null);
+}
+
+function renderProjectSelect() {
   const sel = $("project-select");
   sel.innerHTML = "";
   for (const p of state.projects) {
@@ -251,13 +448,11 @@ async function loadProjects(selectId) {
   }
   if (!state.projects.length) {
     const opt = document.createElement("option");
-    opt.textContent = "（尚無專案）";
+    opt.textContent = t("empty.noProjectOption");
     opt.disabled = true; opt.selected = true;
     sel.appendChild(opt);
   }
-  const remembered = selectId ?? Number(localStorage.getItem("devdeck.project"));
-  const target = state.projects.find(p => p.id === remembered) || state.projects[0];
-  await selectProject(target ? target.id : null);
+  if (state.projectId != null) sel.value = state.projectId;
 }
 
 async function selectProject(id) {
@@ -267,7 +462,7 @@ async function selectProject(id) {
   if (!id) {
     $("services").innerHTML = ""; $("action-list").innerHTML = "";
     $("empty").hidden = false;
-    $("empty").textContent = "還沒有專案，按「＋ 新增專案」開始。";
+    $("empty").textContent = t("empty.noProject");
     return;
   }
   localStorage.setItem("devdeck.project", id);
@@ -299,10 +494,10 @@ async function refreshStatus() {
     const div = document.createElement("div");
     div.className = "svc";
     const light = s.listening ? "on" : "off";
-    let extra = s.listening ? "運行中" : "已停止";
-    if (s.pid != null) extra += s.pid_alive ? `（PID ${s.pid}）` : `（PID 檔殘留）`;
+    let extra = s.listening ? t("svc.running") : t("svc.stopped");
+    if (s.pid != null) extra += s.pid_alive ? t("svc.pid", { pid: s.pid }) : t("svc.pidStale");
     const open = s.url
-      ? `<a class="svc-open ${s.listening ? "" : "dim"}" href="${esc(s.url)}" target="_blank">開啟 ↗</a>`
+      ? `<a class="svc-open ${s.listening ? "" : "dim"}" href="${esc(s.url)}" target="_blank">${t("svc.open")}</a>`
       : "";
     div.innerHTML = `<span class="light ${light}"></span><b>${esc(s.name)}</b>
       <small>:${s.port} ${esc(extra)}</small>${open}`;
@@ -342,12 +537,12 @@ function renderActions() {
   box.innerHTML = "";
   $("empty").hidden = state.actions.length > 0;
   if (!state.actions.length) {
-    $("empty").textContent = "此專案還沒有動作，按「＋ 新增動作」從腳本目錄挑選。";
+    $("empty").textContent = t("empty.noAction");
     return;
   }
   const groups = new Map();
   for (const a of state.actions) {
-    const key = a.category || "未分類";
+    const key = a.category || t("cat.uncategorized");
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(a);
   }
@@ -364,7 +559,7 @@ function renderActions() {
         <button class="run" data-id="${a.id}">${esc(a.label)}
           <span class="file">${esc(a.script_file || "$ " + (a.command || ""))}</span></button>
         <span class="mgmt">
-          <button class="edit" data-id="${a.id}">編輯</button>
+          <button class="edit" data-id="${a.id}">${t("common.edit")}</button>
         </span>`;
       row.appendChild(card);
     }
@@ -399,7 +594,7 @@ function handleRunEvent(block) {
   } else if (event === "line") {
     appendOutput(d);
   } else if (event === "done") {
-    appendOutput(`— 結束，exit code ${d.exit_code} —`, d.exit_code === 0 ? "meta" : "err");
+    appendOutput(t("run.done", { code: d.exit_code }), d.exit_code === 0 ? "meta" : "err");
   } else if (event === "error") {
     appendOutput(d, "err");
   }
@@ -411,7 +606,8 @@ async function runAction(id, btn) {
   document.querySelectorAll(".run.running").forEach(b => b.classList.remove("running"));
   btn.classList.add("running");
   const label = btn.childNodes[0].textContent.trim();
-  $("output-title").textContent = `輸出 — ${label}`;
+  state.outputLabel = label;
+  renderOutputTitle();
   $("output").innerHTML = "";
   const ctrl = new AbortController();
   state.runAbort = ctrl;
@@ -440,7 +636,7 @@ async function runAction(id, btn) {
       }
     }
   } catch (e) {
-    if (e.name !== "AbortError") appendOutput(`— 連線中斷：${e.message} —`, "err");
+    if (e.name !== "AbortError") appendOutput(t("run.aborted", { msg: e.message }), "err");
   }
   if (state.runAbort === ctrl) state.runAbort = null;
   btn.classList.remove("running");
@@ -457,10 +653,10 @@ function svcRow(s = {}) {
     <td><input class="s-port" type="number" value="${s.port ?? ""}" placeholder="8000" style="width:80px"></td>
     <td><input class="s-pid" value="${esc(s.pid_file || "")}" placeholder="uvicorn.pid"></td>
     <td style="text-align:center"><input type="checkbox" class="s-web" ${s.url ? "checked" : ""}></td>
-    <td><button class="danger s-del" style="font-size:12px">刪</button></td>`;
+    <td><button class="danger s-del" style="font-size:12px">${t("common.delete")}</button></td>`;
   tr.querySelector(".s-del").onclick = async () => {
     if (s.id) {
-      if (!confirm(`刪除服務「${s.name}」？`)) return;
+      if (!confirm(t("confirm.delSvc", { name: s.name }))) return;
       await api("DELETE", `/api/services/${s.id}`);
     }
     tr.remove();
@@ -471,7 +667,7 @@ function svcRow(s = {}) {
 function openProjectDialog(editing) {
   state.editingProject = editing;
   const p = editing ? currentProject() : null;
-  $("project-dialog-title").textContent = editing ? "編輯專案" : "新增專案";
+  $("project-dialog-title").textContent = t(editing ? "proj.editTitle" : "proj.addTitle");
   $("p-name").value = p ? p.name : "";
   $("p-path").value = p ? p.path : "";
   $("p-scripts").value = p ? p.scripts_dir : "scripts";
@@ -493,7 +689,7 @@ async function saveProject() {
     scripts_dir: $("p-scripts").value.trim() || "scripts",
     venv_path: $("p-venv").value.trim() || ".venv",
   };
-  if (!body.name || !body.path) return toast("名稱與路徑必填");
+  if (!body.name || !body.path) return toast(t("toast.nameReq"));
   try {
     let id = state.projectId;
     if (state.editingProject) {
@@ -527,7 +723,7 @@ async function saveProject() {
 async function openActionDialog(actionId) {
   state.editingActionId = actionId;
   const a = actionId ? state.actions.find(x => x.id === actionId) : null;
-  $("action-dialog-title").textContent = a ? "編輯動作" : "新增動作";
+  $("action-dialog-title").textContent = t(a ? "act.editTitle" : "act.addTitle");
   try { state.scan = await api("GET", `/api/projects/${state.projectId}/scan`); }
   catch { state.scan = []; }  // 掃描失敗（如腳本目錄不存在）仍可新增「直接指令」
 
@@ -541,13 +737,13 @@ async function openActionDialog(actionId) {
   }
   if (!sel.options.length) {
     const opt = document.createElement("option");
-    opt.value = ""; opt.textContent = "（無可新增的腳本）";
+    opt.value = ""; opt.textContent = t("act.noScript");
     sel.appendChild(opt);
   }
 
   const box = $("a-services");
   box.innerHTML = state.services.length
-    ? "" : `<small style="color:var(--muted)">此專案尚未設定服務（在「編輯專案」中加入）</small>`;
+    ? "" : `<small style="color:var(--muted)">${t("act.noServices")}</small>`;
   for (const s of state.services) {
     const link = a?.services?.find(x => x.service_id === s.id);
     const running = state.status.get(s.id);
@@ -558,8 +754,8 @@ async function openActionDialog(actionId) {
       <span class="light ${running === true ? "on" : running === false ? "off" : ""}"></span>
       <span style="min-width:110px;color:var(--text)">${esc(s.name)} (:${s.port})</span>
       <select class="l-when">
-        <option value="running">運行中時停用</option>
-        <option value="stopped">停止時停用</option>
+        <option value="running">${t("act.whenRunning")}</option>
+        <option value="stopped">${t("act.whenStopped")}</option>
       </select>`;
     row.querySelector(".l-when").value = link?.disable_when || "running";
     box.appendChild(row);
@@ -608,9 +804,9 @@ async function saveAction() {
     workdir: $("a-workdir").value.trim() || null,
     sort_order: Number($("a-sort").value) || 0,
   };
-  if (!body.label) return toast("顯示名稱必填");
-  if (type === "script" && !body.script_file) return toast("請選擇腳本檔案");
-  if (type === "command" && !body.command) return toast("指令內容必填");
+  if (!body.label) return toast(t("toast.labelReq"));
+  if (type === "script" && !body.script_file) return toast(t("toast.scriptReq"));
+  if (type === "command" && !body.command) return toast(t("toast.commandReq"));
   try {
     if (state.editingActionId) await api("PUT", `/api/actions/${state.editingActionId}`, body);
     else await api("POST", `/api/projects/${state.projectId}/actions`, body);
@@ -627,7 +823,7 @@ $("btn-edit-project").onclick = () => openProjectDialog(true);
 $("btn-save-project").onclick = saveProject;
 $("btn-del-project").onclick = async () => {
   const p = currentProject();
-  if (!confirm(`刪除專案「${p.name}」及其所有動作設定？（不會動到專案檔案本身）`)) return;
+  if (!confirm(t("confirm.delProject", { name: p.name }))) return;
   await api("DELETE", `/api/projects/${p.id}`);
   $("project-dialog").close();
   await loadProjects();
@@ -637,20 +833,21 @@ $("btn-add-action").onclick = () => openActionDialog(null);
 $("btn-save-action").onclick = saveAction;
 $("btn-del-action").onclick = async () => {
   const a = state.actions.find(x => x.id === state.editingActionId);
-  if (!confirm(`刪除動作「${a.label}」？`)) return;
+  if (!confirm(t("confirm.delAction", { label: a.label }))) return;
   await api("DELETE", `/api/actions/${a.id}`);
   $("action-dialog").close();
   await selectProject(state.projectId);
 };
 $("manage-toggle").onchange = e => document.body.classList.toggle("manage", e.target.checked);
 $("btn-shutdown").onclick = async () => {
-  if (!confirm("關閉 devdeck 伺服器？（不影響已啟動的專案服務）")) return;
+  if (!confirm(t("confirm.shutdown"))) return;
   clearInterval(state.statusTimer);
   try { await api("POST", "/api/shutdown"); } catch {}
   document.body.innerHTML =
-    `<div class="empty" style="margin-top:80px">devdeck 已關閉，此分頁可以關掉了。</div>`;
+    `<div class="empty" style="margin-top:80px">${t("shutdown.done")}</div>`;
 };
-$("btn-clear-output").onclick = () => { $("output").innerHTML = ""; $("output-title").textContent = "輸出"; };
+$("btn-clear-output").onclick = () => { $("output").innerHTML = ""; state.outputLabel = null; renderOutputTitle(); };
+$("lang-select").onchange = e => setLang(e.target.value);
 $("action-list").addEventListener("click", e => {
   const runBtn = e.target.closest("button.run");
   if (runBtn) return runAction(Number(runBtn.dataset.id), runBtn);
@@ -658,6 +855,7 @@ $("action-list").addEventListener("click", e => {
   if (editBtn) return openActionDialog(Number(editBtn.dataset.id));
 });
 
+setLang(detectLang());
 loadProjects();
 startStatusPolling();
 </script>
