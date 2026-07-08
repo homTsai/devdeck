@@ -9,6 +9,18 @@
 本機開發腳本啟動面板：把各專案 `scripts/` 目錄裡的腳本設定成按鈕，點擊即執行、即時看輸出，
 常駐服務（FastAPI / Vite）以 port 探測顯示運行狀態燈。
 
+### 需求（Requirements）
+
+- **Python 3.10+**（程式用到 `X | None` 型別語法）。Windows 需 PATH 上有 `python`、macOS 需 `python3`；
+  首次啟動腳本會自動建立 `.venv` 並安裝 `fastapi` / `uvicorn`。
+- **支援平台**：官方支援 **Windows** 與 **macOS**；**Linux 未測試、屬非官方 best-effort**（見下方設計說明）。
+- **依腳本類型另需**（只在你真的用到該類型時才需要）：
+  - `.ps1`：PowerShell —— Windows 內建 `powershell` 即可（建議裝 PowerShell 7 / `pwsh`）；**macOS 需自行安裝 `pwsh`**。
+  - `.mjs` / `.js`：PATH 上要有 `node`。
+  - `.sh`：需 `bash`（Windows 可用 Git Bash 提供）。
+  - `.py`：用**該專案自己的 venv**（非 devdeck 的 venv）內的 python，需在專案設定指好 venv 路徑。
+  - 直接指令型動作走各平台的 shell（Windows `pwsh` / `powershell`、macOS / Linux `bash`），預設都已具備。
+
 ### 啟動與關閉
 
 Windows：
@@ -105,6 +117,28 @@ Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘
 
 `.ps1` `.py` `.sh` `.mjs` `.js` `.cmd` `.bat`
 
+### 疑難排解（Troubleshooting）
+
+- **動作輸出顯示某個直譯器「找不到」（pwsh / node / bash）**：對應直譯器不在 PATH 上。裝好該工具、
+  確認終端機能直接呼叫；devdeck 依副檔名分派（見上方設計說明）。
+  - macOS 從 Finder / Dock 啟動只會拿到精簡 PATH，`start-devdeck.sh` 已用登入 shell 解析完整 PATH 再帶給
+    伺服器；若仍找不到，確認該工具有寫進你的登入 shell rc（`~/.zshrc` 等），或改從終端機執行
+    `./start-devdeck.sh`。
+- **動作輸出顯示「找不到專案 venv 的 python」**：該專案的 venv 路徑（預設 `.venv`）不存在或設錯。到專案
+  設定確認 venv 路徑，或先在專案目錄建好 venv。
+- **Port 被占用 / 想釘死固定 port**：devdeck 預設 `7999`，被占用時自動往下試 `7998`–`7990`，全滿則退到
+  隨機臨時埠；實際 port 記在資料目錄的 `devdeck.port`，啟動腳本會自動讀。要指定固定 port，設環境變數
+  `DEVDECK_PORT`（如 `DEVDECK_PORT=8080`）——**指定後不做 fallback**，該 port 若被占用會直接啟動失敗。
+- **macOS 雙擊 `.command` 沒反應或被擋**：
+  - 被 Gatekeeper 擋（只給「完成 / 丟到垃圾桶」）→ 見上方〈macOS：雙擊被 Gatekeeper 擋住怎麼辦〉。
+  - 雙擊沒反應、或被編輯器打開 → 檔案可能少了執行權限：終端機執行 `chmod +x devdeck.command`。`.sh` 在
+    Finder 雙擊本來就不會執行（會用編輯器開），請改用 `.command` 或 `devdeck.app`。
+- **關閉 cloudflared（或其他常駐服務）要不要加 `-Force`？** 這是使用建議、非 devdeck 行為：PowerShell 的
+  `Stop-Process` **無論加不加 `-Force`，對 console 程式都是硬砍**（底層 `TerminateProcess`）；`-Force` 只決定
+  「跳不跳確認 / 能否砍非自己擁有的程序」，**與優雅登出無關**。要讓 cloudflared 優雅 drain 並向 edge 註銷：
+  **Unix** 用 `kill -2 <pid>`（SIGINT）；**Windows** 的 `Stop-Process` 做不到，最實際是把該服務開在**外部
+  終端機**再按 Ctrl-C（後續規劃的 `in_terminal` 動作會直接支援）。
+
 ### 開發計畫（Roadmap）
 
 - 腳本檔案型動作可設定**固定附加參數**（存於動作設定）。
@@ -120,6 +154,21 @@ Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘
 A local dev-script launcher panel: turn the scripts in each project's `scripts/` directory into
 buttons — click to run, watch live output, and monitor long-running services (FastAPI / Vite)
 with port-probe status lights.
+
+### Requirements
+
+- **Python 3.10+** (the code uses the `X | None` type syntax). Windows needs `python` on PATH; macOS needs
+  `python3`. The first launch auto-creates `.venv` and installs `fastapi` / `uvicorn`.
+- **Supported platforms**: **Windows** and **macOS** are officially supported; **Linux is untested,
+  unofficial best-effort** (see the design notes below).
+- **Per-script-type extras** (only needed if you actually use that type):
+  - `.ps1`: PowerShell — Windows ships `powershell` (PowerShell 7 / `pwsh` recommended); **macOS needs `pwsh`
+    installed separately**.
+  - `.mjs` / `.js`: `node` on PATH.
+  - `.sh`: `bash` (on Windows, e.g. from Git Bash).
+  - `.py`: run with **the project's own venv** python (not devdeck's), so set the venv path in project settings.
+  - Raw-command actions run through the platform shell (Windows `pwsh` / `powershell`, macOS / Linux `bash`),
+    all present by default.
 
 ### Start & stop
 
@@ -233,6 +282,35 @@ when cloned via a GUI tool such as Sourcetree). Clear it any one of three ways:
 ### Supported script extensions
 
 `.ps1` `.py` `.sh` `.mjs` `.js` `.cmd` `.bat`
+
+### Troubleshooting
+
+- **An action's output says an interpreter is "not found" (pwsh / node / bash)**: the matching interpreter
+  isn't on PATH. Install it and make sure your terminal can call it directly; devdeck dispatches by file
+  extension (see design notes).
+  - On macOS, launching from Finder / the Dock only inherits a minimal PATH. `start-devdeck.sh` already
+    resolves your full login-shell PATH before starting the server; if a tool is still missing, make sure it
+    is exported in your login-shell rc (`~/.zshrc`, …), or run `./start-devdeck.sh` from a terminal.
+- **An action says the project venv's python is "not found"**: the project's venv path (default `.venv`) is
+  missing or wrong. Check the venv path in the project settings, or create the venv in the project directory
+  first.
+- **Port already in use / pin a fixed port**: devdeck defaults to `7999`, falling back down through
+  `7998`–`7990`, then to a random ephemeral port; the actual port is recorded in `devdeck.port` in the data
+  directory and read by the launchers. To pin a port, set the `DEVDECK_PORT` environment variable (e.g.
+  `DEVDECK_PORT=8080`) — **no fallback then**, so startup fails outright if that port is taken.
+- **macOS: double-clicking `.command` does nothing or is blocked**:
+  - Blocked by Gatekeeper (only "Done / Move to Trash") → see "macOS: first launch blocked by Gatekeeper"
+    above.
+  - Nothing happens / it opens in an editor → the file may lack the execute bit: run
+    `chmod +x devdeck.command`. Double-clicking a `.sh` in Finder never runs it (it opens in an editor) — use
+    `.command` or `devdeck.app` instead.
+- **Should I add `-Force` when stopping cloudflared (or other long-running services)?** This is usage
+  guidance, not devdeck behavior: PowerShell's `Stop-Process` **hard-kills console programs with or without
+  `-Force`** (underlying `TerminateProcess`); `-Force` only governs confirmation prompts / killing processes
+  you don't own — it has **nothing to do with graceful shutdown**. To let cloudflared drain gracefully and
+  deregister from the edge: **Unix** — `kill -2 <pid>` (SIGINT); **Windows** — `Stop-Process` can't, so the
+  practical route is to run the service in an **external terminal** and press Ctrl-C (a planned `in_terminal`
+  action will support this directly).
 
 ### Roadmap
 

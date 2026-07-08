@@ -9,8 +9,8 @@
 | # | 項目 | 優先度 | 現況 | 具體動作 |
 |---|------|--------|------|----------|
 | 1 | requirements.txt 版本鎖定 | 🔴 高 | ✅ 已完成 | 已改為 `fastapi>=0.104.0`、`uvicorn>=0.24.0` |
-| 2 | README 補 **Requirements** 段 | 🟡 中 | 待辦 | 標明 Python 3.10+、支援範圍（**官方支援 Windows + macOS；Linux 未測試、非官方支援**）、`pwsh`（macOS 可選） |
-| 3 | README 補 **Troubleshooting** 段 | 🟡 中 | 待辦 | 收錄「找不到 python/node/bash」「port 被占用 → `DEVDECK_PORT`」「macOS 無法雙擊 .command → 權限」 |
+| 2 | README 補 **Requirements** 段 | 🟡 中 | ✅ 已完成 | 已加 Requirements 段（繁中／英）：Python 3.10+、官方支援 Windows + macOS（Linux 非官方）、依腳本類型的 pwsh / node / bash / venv 需求 |
+| 3 | README 補 **Troubleshooting** 段 | 🟡 中 | ✅ 已完成 | 已加 Troubleshooting 段（繁中／英）：直譯器找不到、venv python 找不到、`DEVDECK_PORT`、macOS `.command` 權限、cloudflared `-Force` know-how |
 | 4 | 錯誤訊息友善化 | 🟡 中 | 待辦 | `app/runner.py` 訊息附「怎麼解決」提示 + 指向 README Troubleshooting 錨點 |
 | 5 | 跨平台實測 | 🟡 中 | ✅ 完成 | macOS 已實測並修正（commits `0984f71`、`ef878d5`、`3491e00`）；Windows 為主要使用平台；**Linux 非官方支援、不列入實測**（見備註） |
 | 6 | CHANGELOG | 🟢 低 | 待辦 | 有版本規劃再建，先擺著 |
