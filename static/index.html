@@ -112,6 +112,11 @@
   #svc-table input { width: 100%; }
   fieldset { border: 1px solid var(--border); border-radius: 8px; margin: 14px 0 0; }
   fieldset legend { color: var(--muted); font-size: 13px; padding: 0 6px; }
+  /* 路徑欄位：輸入框 + 原生資料夾選擇器按鈕並排 */
+  .path-field { display: flex; gap: 6px; margin-top: 4px; }
+  .path-field input { flex: 1 1 0; min-width: 0; margin-top: 0; }
+  .path-field .browse { flex: none; padding: 6px 10px; white-space: nowrap; }
+  .path-field .browse:disabled { opacity: .5; cursor: progress; }
 </style>
 </head>
 <body>
@@ -147,9 +152,21 @@
 <dialog id="project-dialog">
   <h3 id="project-dialog-title">新增專案</h3>
   <label><span data-i18n="proj.name">專案名稱</span> <input id="p-name" required></label>
-  <label><span data-i18n="proj.path">專案路徑</span> <input id="p-path" placeholder="D:\git\web\myproject" required></label>
-  <label><span data-i18n="proj.scriptsDir">腳本目錄（相對於專案路徑）</span><input id="p-scripts" value="scripts"></label>
-  <label><span data-i18n="proj.venv">venv 路徑（相對於專案路徑）</span><input id="p-venv" value=".venv"></label>
+  <label><span data-i18n="proj.path">專案路徑</span>
+    <span class="path-field">
+      <input id="p-path" placeholder="D:\git\web\myproject" required>
+      <button type="button" class="browse" id="browse-p-path" data-i18n="common.browse">瀏覽…</button>
+    </span></label>
+  <label><span data-i18n="proj.scriptsDir">腳本目錄（相對於專案路徑）</span>
+    <span class="path-field">
+      <input id="p-scripts" value="scripts">
+      <button type="button" class="browse" id="browse-p-scripts" data-i18n="common.browse">瀏覽…</button>
+    </span></label>
+  <label><span data-i18n="proj.venv">venv 路徑（相對於專案路徑）</span>
+    <span class="path-field">
+      <input id="p-venv" value=".venv">
+      <button type="button" class="browse" id="browse-p-venv" data-i18n="common.browse">瀏覽…</button>
+    </span></label>
   <fieldset id="svc-fieldset" hidden>
     <legend data-i18n="proj.svcLegend">服務（狀態監測）</legend>
     <table id="svc-table">
@@ -188,7 +205,11 @@
     <legend data-i18n="act.svcLegend">按鈕狀態關聯（勾選的條件「全部成立」時停用此按鈕）</legend>
     <div id="a-services"></div>
   </fieldset>
-  <label><span data-i18n="act.workdir">工作目錄（選填，預設為專案路徑）</span><input id="a-workdir"></label>
+  <label><span data-i18n="act.workdir">工作目錄（選填，預設為專案路徑）</span>
+    <span class="path-field">
+      <input id="a-workdir">
+      <button type="button" class="browse" id="browse-a-workdir" data-i18n="common.browse">瀏覽…</button>
+    </span></label>
   <label><span data-i18n="act.sort">排序（數字小的在前）</span><input id="a-sort" type="number" value="0"></label>
   <div class="btns">
     <button id="btn-del-action" class="danger" hidden data-i18n="act.del">刪除動作</button>
@@ -218,6 +239,11 @@ const I18N = {
     "common.save": "儲存",
     "common.edit": "編輯",
     "common.delete": "刪",
+    "common.browse": "瀏覽…",
+    "pick.projectPath": "選擇專案資料夾",
+    "pick.scriptsDir": "選擇腳本資料夾",
+    "pick.venvDir": "選擇 venv 資料夾",
+    "pick.workdir": "選擇工作目錄",
     "proj.addTitle": "新增專案",
     "proj.editTitle": "編輯專案",
     "proj.name": "專案名稱",
@@ -285,6 +311,8 @@ const I18N = {
     "err.scriptsDirMissing": "腳本目錄不存在：{dir}",
     "err.serviceNotFound": "找不到服務",
     "err.actionNotFound": "找不到動作",
+    "err.pickerUnavailable": "無法開啟資料夾選擇視窗——此環境可能缺少 tkinter（Linux 請安裝 python3-tk）。你仍可手動輸入路徑。",
+    "err.pickerFailed": "開啟資料夾選擇視窗失敗：{detail}",
   },
   "en": {
     "header.addProject": "+ Add project",
@@ -300,6 +328,11 @@ const I18N = {
     "common.save": "Save",
     "common.edit": "Edit",
     "common.delete": "Del",
+    "common.browse": "Browse…",
+    "pick.projectPath": "Select project folder",
+    "pick.scriptsDir": "Select scripts folder",
+    "pick.venvDir": "Select venv folder",
+    "pick.workdir": "Select working directory",
     "proj.addTitle": "Add project",
     "proj.editTitle": "Edit project",
     "proj.name": "Project name",
@@ -367,6 +400,8 @@ const I18N = {
     "err.scriptsDirMissing": "Scripts folder does not exist: {dir}",
     "err.serviceNotFound": "Service not found",
     "err.actionNotFound": "Action not found",
+    "err.pickerUnavailable": "Could not open the folder picker — tkinter may be missing (on Linux install python3-tk). You can still type the path manually.",
+    "err.pickerFailed": "Failed to open the folder picker: {detail}",
   },
 };
 let LANG = DEFAULT_LANG;
@@ -888,6 +923,27 @@ $("action-list").addEventListener("click", e => {
   const editBtn = e.target.closest("button.edit");
   if (editBtn) return openActionDialog(Number(editBtn.dataset.id));
 });
+
+/* ---------- 資料夾選擇器 ---------- */
+// 後端開系統原生「選擇資料夾」視窗、回傳絕對路徑。scripts/venv 選完也直接存絕對值
+// （不轉相對，避免跨磁碟／跳出專案的問題）；initialdir 讓對話框從專案路徑開起。
+function wirePick(btnId, targetId, titleKey, getInitial) {
+  const btn = $(btnId);
+  btn.onclick = async () => {
+    btn.disabled = true;
+    try {
+      const res = await api("POST", "/api/pick-directory", {
+        initialdir: getInitial() || "", title: t(titleKey),
+      });
+      if (res.path) $(targetId).value = res.path;  // 取消回 null，保留原值
+    } catch (e) { toast(e.message); }
+    finally { btn.disabled = false; }
+  };
+}
+wirePick("browse-p-path", "p-path", "pick.projectPath", () => $("p-path").value.trim());
+wirePick("browse-p-scripts", "p-scripts", "pick.scriptsDir", () => $("p-path").value.trim() || $("p-scripts").value.trim());
+wirePick("browse-p-venv", "p-venv", "pick.venvDir", () => $("p-path").value.trim() || $("p-venv").value.trim());
+wirePick("browse-a-workdir", "a-workdir", "pick.workdir", () => $("a-workdir").value.trim() || currentProject()?.path || "");
 
 setLang(detectLang());
 loadProjects();

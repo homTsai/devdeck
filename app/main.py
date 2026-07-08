@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import secrets
+import sys
 from pathlib import Path
 
 from typing import Literal
@@ -22,6 +23,33 @@ app = FastAPI(title="devdeck")
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 SCRIPT_EXTS = {".ps1", ".py", ".sh", ".mjs", ".js", ".cmd", ".bat"}
+
+# 資料夾選擇器：devdeck 跑在使用者本機，所以由後端叫出系統原生「選擇資料夾」視窗，
+# 回傳真實絕對路徑（瀏覽器的 file input 拿不到絕對路徑）。用短命子行程跑 tkinter，
+# 避免和 uvicorn 的 async event loop 搶主執行緒。
+_PICK_DIR_CODE = r"""
+import os, sys
+try:
+    import tkinter as tk
+    from tkinter import filedialog
+except Exception as e:
+    sys.stderr.write("tkinter unavailable: %s" % e)
+    sys.exit(2)
+initialdir = sys.argv[1] if len(sys.argv) > 1 else ""
+title = sys.argv[2] if len(sys.argv) > 2 else "Select folder"
+if initialdir and not os.path.isdir(initialdir):
+    initialdir = ""
+root = tk.Tk()
+root.withdraw()
+try:
+    root.attributes("-topmost", True)
+except Exception:
+    pass
+path = filedialog.askdirectory(initialdir=initialdir or None, title=title)
+root.destroy()
+if path:
+    sys.stdout.write(os.path.normpath(path))
+"""
 
 db.init_db()
 
@@ -95,6 +123,11 @@ class ActionIn(BaseModel):
     def validate_source(self):
         if bool(self.script_file) == bool(self.command):
             raise HTTPException(400, detail={"key": "err.scriptXorCommand"})
+
+
+class PickDirIn(BaseModel):
+    initialdir: str | None = None  # 對話框起始資料夾（如專案路徑）；不存在則忽略
+    title: str | None = None       # 對話框標題（由前端依語系帶入）
 
 
 # ---------- helpers ----------
@@ -340,6 +373,32 @@ async def run_action(action_id: int, _body: dict = Body(default={})):
             yield ev("error", {"key": e.key, "params": e.params})
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+# ---------- pick directory ----------
+
+@app.post("/api/pick-directory")
+async def pick_directory(body: PickDirIn):
+    """開系統原生資料夾選擇視窗，回傳選定的絕對路徑（取消回 null）。
+
+    dialog 在跑 uvicorn 的機器桌面彈出——devdeck 只綁 127.0.0.1，所以就是使用者本機。
+    """
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable, "-c", _PICK_DIR_CODE,
+            body.initialdir or "", body.title or "Select folder",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        out, err = await proc.communicate()
+    except OSError as e:
+        raise HTTPException(500, detail={"key": "err.pickerFailed", "params": {"detail": str(e)}})
+    if proc.returncode != 0:
+        # 多半是缺 tkinter（例如 Linux 未安裝 python3-tk）
+        detail = err.decode("utf-8", "replace").strip()[-300:]
+        raise HTTPException(500, detail={"key": "err.pickerUnavailable", "params": {"detail": detail}})
+    path = out.decode("utf-8", errors="replace").strip()
+    return {"path": path or None}
 
 
 # ---------- health ----------

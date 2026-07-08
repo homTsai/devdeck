@@ -142,6 +142,9 @@ Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘
   「跳不跳確認 / 能否砍非自己擁有的程序」，**與優雅登出無關**。要讓 cloudflared 優雅 drain 並向 edge 註銷：
   **Unix** 用 `kill -2 <pid>`（SIGINT）；**Windows** 的 `Stop-Process` 做不到，最實際是把該服務開在**外部
   終端機**再按 Ctrl-C（後續規劃的 `in_terminal` 動作會直接支援）。
+- **按「瀏覽…」選資料夾時沒反應**：路徑欄位的資料夾選擇器由後端叫出系統原生視窗，需要 Python 的
+  tkinter。Windows／macOS 的官方 Python 已內建；**Linux**（非官方支援）多半要另裝，例如
+  `sudo apt install python3-tk`。若無法安裝也不影響——路徑欄位一律可手動輸入。
 
 ### 開發計畫（Roadmap）
 
@@ -320,6 +323,10 @@ when cloned via a GUI tool such as Sourcetree). Clear it any one of three ways:
   deregister from the edge: **Unix** — `kill -2 <pid>` (SIGINT); **Windows** — `Stop-Process` can't, so the
   practical route is to run the service in an **external terminal** and press Ctrl-C (a planned `in_terminal`
   action will support this directly).
+- **Clicking "Browse…" to pick a folder does nothing**: the folder picker opens a native OS dialog from the
+  backend, which needs Python's tkinter. The official Python builds on Windows / macOS bundle it; on **Linux**
+  (unofficial) you usually need it separately, e.g. `sudo apt install python3-tk`. If you can't install it,
+  that's fine — every path field can still be typed in by hand.
 
 ### Roadmap
 
