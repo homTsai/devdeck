@@ -78,9 +78,13 @@ Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘
    「開啟 ↗」連結，直接開 `http://localhost:{port}` 首頁（服務停止時連結變暗但仍可點）；
    不是網頁的 port 不勾即可。
 3. **新增動作**：兩種類型擇一——
-   - **腳本檔案**：從腳本目錄掃描結果挑選；
+   - **腳本檔案**：從腳本目錄掃描結果挑選；可填固定的**附加指令參數**（例如
+     `--port 8000 --name "My App"`），每次按下按鈕都會附加到腳本後；
    - **直接指令**：直接輸入指令（如 `alembic upgrade head`），會在工作目錄以 shell 執行，
      且專案 venv 已掛入 PATH（指令可直接使用 venv 內的 alembic / python 等工具）。
+
+   每個動作都可選擇執行方式：**面板執行**（預設，輸出串流回 devdeck）或**外部終端機**
+   （使用相同工作目錄與參數另開可互動的 PowerShell／Terminal；輸出與輸入都在該視窗）。
 
    再設定顯示名稱、分類、工作目錄（預設專案路徑），並可勾選**按鈕狀態關聯**：
    對每個勾選的服務選擇「運行中時停用」或「停止時停用」，勾選的條件**全部成立**時該按鈕會停用
@@ -96,7 +100,8 @@ Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘
   Linux `${XDG_DATA_HOME:-~/.local/share}/devdeck/`；舊版放在程式目錄旁的資料會在啟動時
   自動搬移。設定**不進版控**——不同電腦可用的腳本本來就不同（Windows/Mac），
   各機器維護自己的設定，換機器後需重新登記專案與動作。
-- 腳本路徑存相對於腳本目錄的檔名，專案搬家只需改專案路徑。
+- 腳本路徑存相對於腳本目錄的檔名，專案搬家只需改專案路徑。腳本動作的附加參數會以
+  引數陣列直接交給執行器，而非透過 shell；含空白的單一參數請用雙引號包住。
 - 依副檔名分派執行器：`.ps1` → pwsh、`.py` → **該專案 venv 的 python**、`.mjs/.js` → node、
   `.sh` → bash、`.cmd/.bat` → cmd。`.ps1` 在 macOS 需另裝 pwsh，建議在 Mac 上改用
   `.sh`/`.py` 腳本或指令型動作。
@@ -148,7 +153,6 @@ Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘
 
 ### 開發計畫（Roadmap）
 
-- 腳本檔案型動作可設定**固定附加參數**（存於動作設定）。
 - 腳本檔案型動作支援**右鍵開啟對話框**，臨時輸入僅此一次的命令參數後執行。
 - **非專案型指令的歸納**（全域動作群組）；現階段可先把使用者家目錄
   （如 `C:\Users\{user}`）新增為一個「專案」暫代。
@@ -243,7 +247,8 @@ when cloned via a GUI tool such as Sourcetree). Clear it any one of three ways:
    `http://localhost:{port}` (dimmed while stopped, still clickable). Leave it unchecked for
    non-web ports.
 3. **Add an action**, one of two kinds:
-   - **Script file**: picked from a scan of the scripts directory;
+   - **Script file**: picked from a scan of the scripts directory; it can have persistent
+     **extra arguments** such as `--port 8000 --name "My App"`, appended on every run;
    - **Raw command**: e.g. `alembic upgrade head`, executed via shell in the working directory
      with the project venv prepended to PATH (so venv tools like alembic/python resolve directly).
 
@@ -266,7 +271,8 @@ when cloned via a GUI tool such as Sourcetree). Clear it any one of three ways:
   control** — the scripts available differ per machine (Windows/Mac), so each machine keeps
   its own config.
 - Actions store the script filename relative to the scripts directory; moving a project only
-  requires updating the project path.
+  requires updating the project path. Script extra arguments are passed directly as an argument
+  list, never through a shell; quote a single argument containing spaces with double quotes.
 - Interpreter dispatch by extension: `.ps1` → pwsh, `.py` → **the project venv's python**,
   `.mjs/.js` → node, `.sh` → bash, `.cmd/.bat` → cmd. Running `.ps1` on macOS requires pwsh;
   prefer `.sh`/`.py` scripts or raw commands there.
@@ -321,8 +327,7 @@ when cloned via a GUI tool such as Sourcetree). Clear it any one of three ways:
   `-Force`** (underlying `TerminateProcess`); `-Force` only governs confirmation prompts / killing processes
   you don't own — it has **nothing to do with graceful shutdown**. To let cloudflared drain gracefully and
   deregister from the edge: **Unix** — `kill -2 <pid>` (SIGINT); **Windows** — `Stop-Process` can't, so the
-  practical route is to run the service in an **external terminal** and press Ctrl-C (a planned `in_terminal`
-  action will support this directly).
+  practical route is to run the service with the action's **external terminal** mode and press Ctrl-C there.
 - **Clicking "Browse…" to pick a folder does nothing**: the folder picker opens a native OS dialog from the
   backend, which needs Python's tkinter. The official Python builds on Windows / macOS bundle it; on **Linux**
   (unofficial) you usually need it separately, e.g. `sudo apt install python3-tk`. If you can't install it,
@@ -330,7 +335,6 @@ when cloned via a GUI tool such as Sourcetree). Clear it any one of three ways:
 
 ### Roadmap
 
-- Persistent extra arguments for script-file actions (stored with the action).
 - Right-click a script-file action to enter one-time arguments in a dialog before running.
 - A proper home for non-project commands (a global action group); for now, adding your home
   directory (e.g. `C:\Users\{user}`) as a "project" works as a stopgap.

@@ -114,6 +114,8 @@ class ActionServiceLink(BaseModel):
 class ActionIn(BaseModel):
     script_file: str | None = None
     command: str | None = None
+    arguments: str | None = None
+    execution_mode: Literal["panel", "terminal"] = "panel"
     label: str
     services: list[ActionServiceLink] = []
     workdir: str | None = None
@@ -297,9 +299,9 @@ def create_action(project_id: int, body: ActionIn):
     body.validate_source()
     with db.get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO actions (project_id, script_file, command, label, workdir, category, sort_order)"
-            " VALUES (?,?,?,?,?,?,?)",
-            (project_id, body.script_file, body.command, body.label,
+            "INSERT INTO actions (project_id, script_file, command, arguments, execution_mode, label, workdir, category, sort_order)"
+            " VALUES (?,?,?,?,?,?,?,?,?)",
+            (project_id, body.script_file, body.command, body.arguments, body.execution_mode, body.label,
              body.workdir, body.category, body.sort_order),
         )
         _replace_links(conn, cur.lastrowid, body.services)
@@ -311,9 +313,9 @@ def update_action(action_id: int, body: ActionIn):
     body.validate_source()
     with db.get_conn() as conn:
         cur = conn.execute(
-            "UPDATE actions SET script_file=?, command=?, label=?, workdir=?, category=?, sort_order=?"
+            "UPDATE actions SET script_file=?, command=?, arguments=?, execution_mode=?, label=?, workdir=?, category=?, sort_order=?"
             " WHERE id=?",
-            (body.script_file, body.command, body.label, body.workdir,
+            (body.script_file, body.command, body.arguments, body.execution_mode, body.label, body.workdir,
              body.category, body.sort_order, action_id),
         )
         if cur.rowcount == 0:
@@ -358,11 +360,19 @@ async def run_action(action_id: int, _body: dict = Body(default={})):
                     yield ev("error", {"key": "err.scriptNotFound", "params": {"path": str(script_path)}})
                     return
                 cmd = runner.resolve_command(script_path, project)
+                cmd.extend(runner.parse_arguments(action["arguments"]))
         except runner.RunError as e:
             yield ev("error", {"key": e.key, "params": e.params})
             return
         cwd = action["workdir"] or project["path"]
         yield ev("start", {"cmd": cmd, "cwd": cwd})
+        if action["execution_mode"] == "terminal":
+            try:
+                runner.launch_external_terminal(cmd, cwd, env)
+                yield ev("terminal", {})
+            except runner.RunError as e:
+                yield ev("error", {"key": e.key, "params": e.params})
+            return
         try:
             async for kind, payload in runner.stream_run(cmd, cwd, env):
                 if kind == "line":

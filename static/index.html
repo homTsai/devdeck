@@ -106,7 +106,17 @@
   dialog h3 { margin: 0 0 14px; font-size: 15px; }
   dialog label { display: block; margin-bottom: 10px; color: var(--muted); font-size: 13px; }
   dialog label input, dialog label select { display: block; width: 100%; margin-top: 4px; }
+  dialog label input[type="radio"] { display: inline; width: auto; margin: 0; }
   dialog .btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  #action-dialog { width: min(900px, calc(100vw - 40px)); max-height: calc(100vh - 40px); overflow-y: auto; }
+  .action-form-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+  .action-form-column { min-width: 0; }
+  .action-form-column h4 { margin: 0 0 12px; color: var(--muted); font-size: 13px; font-weight: normal; }
+  .action-form-column fieldset { margin: 0 0 10px; }
+  @media (max-width: 700px) {
+    #action-dialog { width: min(560px, calc(100vw - 24px)); }
+    .action-form-grid { grid-template-columns: 1fr; gap: 0; }
+  }
   #svc-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
   #svc-table td { padding: 3px 4px; }
   #svc-table input { width: 100%; }
@@ -191,26 +201,41 @@
 <!-- 動作 dialog -->
 <dialog id="action-dialog">
   <h3 id="action-dialog-title">新增動作</h3>
-  <div style="display:flex;gap:16px;margin-bottom:10px;color:var(--muted);font-size:13px">
-    <span data-i18n="act.typeLabel">動作類型：</span>
-    <label style="margin:0"><input type="radio" name="a-type" value="script" checked> <span data-i18n="act.typeScript">腳本檔案</span></label>
-    <label style="margin:0"><input type="radio" name="a-type" value="command"> <span data-i18n="act.typeCommand">直接指令</span></label>
+  <div class="action-form-grid">
+    <section class="action-form-column">
+      <h4 data-i18n="act.actionInfo">動作資訊</h4>
+      <div style="display:flex;gap:16px;margin-bottom:10px;color:var(--muted);font-size:13px">
+        <span data-i18n="act.typeLabel">動作類型：</span>
+        <label style="margin:0"><input type="radio" name="a-type" value="script" checked> <span data-i18n="act.typeScript">腳本檔案</span></label>
+        <label style="margin:0"><input type="radio" name="a-type" value="command"> <span data-i18n="act.typeCommand">直接指令</span></label>
+      </div>
+      <label><span data-i18n="act.displayName">顯示名稱</span> <input id="a-label" required></label>
+      <label><span data-i18n="act.category">分類（選填）</span><input id="a-category" list="category-list"><datalist id="category-list"></datalist></label>
+      <label><span data-i18n="act.sort">排序（數字小的在前）</span><input id="a-sort" type="number" value="0"></label>
+      <fieldset>
+        <legend data-i18n="act.svcLegend">按鈕狀態關聯（勾選的條件「全部成立」時停用此按鈕）</legend>
+        <div id="a-services"></div>
+      </fieldset>
+    </section>
+    <section class="action-form-column">
+      <h4 data-i18n="act.runInfo">執行設定</h4>
+      <label id="a-script-row"><span data-i18n="act.scriptRow">腳本檔案</span> <select id="a-script"></select></label>
+      <label id="a-arguments-row"><span data-i18n="act.arguments">附加指令參數（選填；含空白的參數請以雙引號包住）</span>
+        <input id="a-arguments" placeholder="--port 8000 --name &quot;My App&quot;"></label>
+      <label id="a-command-row" hidden><span data-i18n="act.commandRow">指令內容（於工作目錄以 shell 執行，專案 venv 已掛入 PATH）</span>
+        <input id="a-command" placeholder="alembic upgrade head"></label>
+      <fieldset>
+        <legend data-i18n="act.executionLegend">執行方式</legend>
+        <label style="margin:0"><input type="radio" name="a-execution-mode" value="panel" checked> <span data-i18n="act.executionPanel">面板執行（預設）</span></label>
+        <label style="margin:0"><input type="radio" name="a-execution-mode" value="terminal"> <span data-i18n="act.executionTerminal">外部終端機（可互動輸入）</span></label>
+      </fieldset>
+      <label><span data-i18n="act.workdir">工作目錄（選填，預設為專案路徑）</span>
+        <span class="path-field">
+          <input id="a-workdir">
+          <button type="button" class="browse" id="browse-a-workdir" data-i18n="common.browse">瀏覽…</button>
+        </span></label>
+    </section>
   </div>
-  <label id="a-script-row"><span data-i18n="act.scriptRow">腳本檔案</span> <select id="a-script"></select></label>
-  <label id="a-command-row" hidden><span data-i18n="act.commandRow">指令內容（於工作目錄以 shell 執行，專案 venv 已掛入 PATH）</span>
-    <input id="a-command" placeholder="alembic upgrade head"></label>
-  <label><span data-i18n="act.displayName">顯示名稱</span> <input id="a-label" required></label>
-  <label><span data-i18n="act.category">分類（選填）</span><input id="a-category" list="category-list"><datalist id="category-list"></datalist></label>
-  <fieldset style="margin:0 0 10px">
-    <legend data-i18n="act.svcLegend">按鈕狀態關聯（勾選的條件「全部成立」時停用此按鈕）</legend>
-    <div id="a-services"></div>
-  </fieldset>
-  <label><span data-i18n="act.workdir">工作目錄（選填，預設為專案路徑）</span>
-    <span class="path-field">
-      <input id="a-workdir">
-      <button type="button" class="browse" id="browse-a-workdir" data-i18n="common.browse">瀏覽…</button>
-    </span></label>
-  <label><span data-i18n="act.sort">排序（數字小的在前）</span><input id="a-sort" type="number" value="0"></label>
   <div class="btns">
     <button id="btn-del-action" class="danger" hidden data-i18n="act.del">刪除動作</button>
     <span class="spacer"></span>
@@ -263,8 +288,14 @@ const I18N = {
     "act.typeLabel": "動作類型：",
     "act.typeScript": "腳本檔案",
     "act.typeCommand": "直接指令",
+    "act.actionInfo": "動作資訊",
+    "act.runInfo": "執行設定",
     "act.scriptRow": "腳本檔案",
+    "act.arguments": "附加指令參數（選填；含空白的參數請以雙引號包住）",
     "act.commandRow": "指令內容（於工作目錄以 shell 執行，專案 venv 已掛入 PATH）",
+    "act.executionLegend": "執行方式",
+    "act.executionPanel": "面板執行（預設）",
+    "act.executionTerminal": "外部終端機（可互動輸入）",
     "act.displayName": "顯示名稱",
     "act.category": "分類（選填）",
     "act.svcLegend": "按鈕狀態關聯（勾選的條件「全部成立」時停用此按鈕）",
@@ -285,6 +316,7 @@ const I18N = {
     "svc.pidStale": "（PID 檔殘留）",
     "svc.open": "開啟 ↗",
     "run.done": "— 結束，exit code {code} —",
+    "run.terminalOpened": "— 已於外部終端機開啟；輸出與互動輸入請在該視窗進行。—",
     "run.aborted": "— 連線中斷：{msg} —",
     "toast.nameReq": "名稱與路徑必填",
     "toast.labelReq": "顯示名稱必填",
@@ -306,6 +338,8 @@ const I18N = {
     "err.spawnFailed": "無法啟動程序：{detail}",
     "err.scriptNotFound": "腳本不存在：{path}",
     "err.scriptXorCommand": "腳本檔案與直接指令必須擇一填寫",
+    "err.noExternalTerminal": "此平台找不到可啟動的外部終端機",
+    "err.invalidArguments": "附加指令參數格式錯誤：{detail}",
     "err.projectNotFound": "找不到專案",
     "err.projectPathMissing": "專案路徑不存在：{path}",
     "err.scriptsDirMissing": "腳本目錄不存在：{dir}",
@@ -352,8 +386,14 @@ const I18N = {
     "act.typeLabel": "Action type:",
     "act.typeScript": "Script file",
     "act.typeCommand": "Direct command",
+    "act.actionInfo": "Action details",
+    "act.runInfo": "Run settings",
     "act.scriptRow": "Script file",
+    "act.arguments": "Extra arguments (optional; quote arguments containing spaces)",
     "act.commandRow": "Command (runs in the working directory via shell; the project venv is on PATH)",
+    "act.executionLegend": "Run mode",
+    "act.executionPanel": "Panel (default)",
+    "act.executionTerminal": "External terminal (interactive input)",
     "act.displayName": "Display name",
     "act.category": "Category (optional)",
     "act.svcLegend": "Button-state links (disable this button when all checked conditions hold)",
@@ -374,6 +414,7 @@ const I18N = {
     "svc.pidStale": "(stale PID file)",
     "svc.open": "Open ↗",
     "run.done": "— Finished, exit code {code} —",
+    "run.terminalOpened": "— Opened in an external terminal; use that window for output and interactive input. —",
     "run.aborted": "— Connection lost: {msg} —",
     "toast.nameReq": "Name and path are required",
     "toast.labelReq": "Display name is required",
@@ -395,6 +436,8 @@ const I18N = {
     "err.spawnFailed": "Failed to start the process: {detail}",
     "err.scriptNotFound": "Script not found: {path}",
     "err.scriptXorCommand": "Fill in either a script file or a direct command, not both.",
+    "err.noExternalTerminal": "No external terminal is available on this platform",
+    "err.invalidArguments": "Invalid extra arguments: {detail}",
     "err.projectNotFound": "Project not found",
     "err.projectPathMissing": "Project path does not exist: {path}",
     "err.scriptsDirMissing": "Scripts folder does not exist: {dir}",
@@ -625,7 +668,7 @@ function renderActions() {
       card.className = "action";
       card.innerHTML = `
         <button class="run" data-id="${a.id}">${esc(a.label)}
-          <span class="file">${esc(a.script_file || "$ " + (a.command || ""))}</span></button>
+          <span class="file">${esc(a.script_file ? a.script_file + (a.arguments ? " " + a.arguments : "") : "$ " + (a.command || ""))}</span></button>
         <span class="mgmt">
           <button class="edit" data-id="${a.id}">${t("common.edit")}</button>
         </span>`;
@@ -663,6 +706,8 @@ function handleRunEvent(block) {
     appendOutput(d);
   } else if (event === "done") {
     appendOutput(t("run.done", { code: d.exit_code }), d.exit_code === 0 ? "meta" : "err");
+  } else if (event === "terminal") {
+    appendOutput(t("run.terminalOpened"), "meta");
   } else if (event === "error") {
     // 後端回 error key（{key, params}）；由前端依語系組訊息。舊格式（純字串）仍相容。
     appendOutput(typeof d === "string" ? d : t(d.key, d.params), "err");
@@ -799,7 +844,6 @@ async function openActionDialog(actionId) {
   const sel = $("a-script");
   sel.innerHTML = "";
   for (const s of state.scan) {
-    if (s.added && (!a || s.file !== a.script_file)) continue;  // 已新增的不重複列出
     const opt = document.createElement("option");
     opt.value = s.file; opt.textContent = s.file;
     sel.appendChild(opt);
@@ -841,6 +885,8 @@ async function openActionDialog(actionId) {
   sel.value = a?.script_file || sel.options[0].value;
   setActionType(a?.command ? "command" : "script");
   $("a-command").value = a?.command || "";
+  $("a-arguments").value = a?.arguments || "";
+  document.querySelector(`input[name="a-execution-mode"][value="${a?.execution_mode || "panel"}"]`).checked = true;
   $("a-label").value = a ? a.label : "";
   $("a-category").value = a?.category || "";
   $("a-workdir").value = a?.workdir || "";
@@ -853,6 +899,7 @@ async function openActionDialog(actionId) {
 function setActionType(t) {
   document.querySelector(`input[name="a-type"][value="${t}"]`).checked = true;
   $("a-script-row").hidden = t !== "script";
+  $("a-arguments-row").hidden = t !== "script";
   $("a-command-row").hidden = t !== "command";
 }
 document.querySelectorAll('input[name="a-type"]').forEach(r => {
@@ -864,6 +911,8 @@ async function saveAction() {
   const body = {
     script_file: type === "script" ? ($("a-script").value || null) : null,
     command: type === "command" ? ($("a-command").value.trim() || null) : null,
+    arguments: type === "script" ? ($("a-arguments").value.trim() || null) : null,
+    execution_mode: document.querySelector('input[name="a-execution-mode"]:checked').value,
     label: $("a-label").value.trim(),
     category: $("a-category").value.trim() || null,
     services: [...document.querySelectorAll("#a-services .l-check:checked")].map(ch => ({

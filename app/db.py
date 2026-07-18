@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS actions (
     project_id  INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     script_file TEXT,               -- 與 command 二選一：腳本目錄內的檔名
     command     TEXT,               -- 與 script_file 二選一：直接執行的指令
+    arguments   TEXT,               -- 腳本檔案的固定附加參數（以 shell 風格引號分隔）
+    execution_mode TEXT NOT NULL DEFAULT 'panel' CHECK (execution_mode IN ('panel', 'terminal')),
     label       TEXT NOT NULL,
     workdir     TEXT,
     category    TEXT,
@@ -121,6 +123,16 @@ def _migrate():
         svc_cols = {r[1] for r in conn.execute("PRAGMA table_info(services)")}
         if svc_cols and "url" not in svc_cols:
             conn.execute("ALTER TABLE services ADD COLUMN url TEXT")
+            conn.commit()
+        # v4 → v5：腳本動作可儲存固定附加參數
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(actions)")}
+        if "arguments" not in cols:
+            conn.execute("ALTER TABLE actions ADD COLUMN arguments TEXT")
+            conn.commit()
+        # v5 → v6：動作可選擇於面板或外部終端機執行
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(actions)")}
+        if "execution_mode" not in cols:
+            conn.execute("ALTER TABLE actions ADD COLUMN execution_mode TEXT NOT NULL DEFAULT 'panel'")
             conn.commit()
     finally:
         conn.close()
