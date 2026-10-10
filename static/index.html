@@ -63,14 +63,13 @@
     overflow: hidden;
   }
   .action > .run {
-    border: none; border-radius: 0; background: none; padding: 10px 16px;
+    border: none; border-radius: 0; background: none; padding: 8px 14px;
     font-size: 14px; text-align: left;
   }
   .action > .run:hover { background: rgba(79,140,255,.12); }
   .action > .run.running { color: var(--accent); }
   .action > .run:disabled { opacity: .35; cursor: not-allowed; }
   .action > .run:disabled:hover { background: none; }
-  .action > .run .file { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
   .action .mgmt { display: none; }
   body.manage .action .mgmt {
     display: flex; flex-direction: column; border-left: 1px solid var(--border);
@@ -666,9 +665,11 @@ function renderActions() {
     for (const a of items) {
       const card = document.createElement("div");
       card.className = "action";
+      const cmdText = a.script_file
+        ? a.script_file + (a.arguments ? " " + a.arguments : "")
+        : "$ " + (a.command || "");
       card.innerHTML = `
-        <button class="run" data-id="${a.id}">${esc(a.label)}
-          <span class="file">${esc(a.script_file ? a.script_file + (a.arguments ? " " + a.arguments : "") : "$ " + (a.command || ""))}</span></button>
+        <button class="run" data-id="${a.id}" title="${esc(cmdText)}">${esc(a.label)}</button>
         <span class="mgmt">
           <button class="edit" data-id="${a.id}">${t("common.edit")}</button>
         </span>`;
