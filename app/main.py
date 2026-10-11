@@ -132,6 +132,10 @@ class PickDirIn(BaseModel):
     title: str | None = None       # 對話框標題（由前端依語系帶入）
 
 
+class CategoryReorderIn(BaseModel):
+    categories: list[str | None]
+
+
 # ---------- helpers ----------
 
 def get_project(project_id: int) -> dict:
@@ -330,6 +334,42 @@ def delete_action(action_id: int):
         cur = conn.execute("DELETE FROM actions WHERE id=?", (action_id,))
         if cur.rowcount == 0:
             raise HTTPException(404, detail={"key": "err.actionNotFound"})
+    return {"ok": True}
+
+
+@app.post("/api/projects/{project_id}/categories/reorder")
+def reorder_categories(project_id: int, body: CategoryReorderIn):
+    get_project(project_id)
+    with db.get_conn() as conn:
+        actions = [dict(r) for r in conn.execute(
+            "SELECT id, category, sort_order FROM actions WHERE project_id=? ORDER BY sort_order, id",
+            (project_id,)
+        )]
+        groups: dict[str | None, list[dict]] = {}
+        for a in actions:
+            cat = a["category"].strip() if a["category"] and a["category"].strip() else None
+            groups.setdefault(cat, []).append(a)
+
+        ordered_keys: list[str | None] = []
+        for c in body.categories:
+            norm_c = c.strip() if c and c.strip() else None
+            if norm_c not in ordered_keys:
+                ordered_keys.append(norm_c)
+
+        for cat in groups.keys():
+            if cat not in ordered_keys:
+                ordered_keys.append(cat)
+
+        current_sort = 10
+        for cat in ordered_keys:
+            cat_actions = groups.get(cat, [])
+            for act in cat_actions:
+                conn.execute(
+                    "UPDATE actions SET sort_order=? WHERE id=?",
+                    (current_sort, act["id"])
+                )
+                current_sort += 10
+            current_sort += 10
     return {"ok": True}
 
 

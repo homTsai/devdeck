@@ -51,10 +51,35 @@
   .svc-open.dim { opacity: .45; }
 
   /* 動作按鈕 */
-  .category { margin-bottom: 20px; }
-  .category h2 {
-    font-size: 13px; color: var(--muted); font-weight: normal;
+  .category {
+    margin-bottom: 20px;
+    border-radius: 6px;
+    transition: opacity .15s ease, box-shadow .15s ease;
+  }
+  .category-header {
+    display: flex; align-items: center; gap: 6px;
     margin: 0 0 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px;
+    user-select: none;
+  }
+  .category-header h2 {
+    font-size: 13px; color: var(--muted); font-weight: normal; margin: 0;
+  }
+  .category-handle {
+    display: none; cursor: grab; user-select: none; color: var(--muted);
+    font-size: 13px; line-height: 1; padding: 2px 4px; border-radius: 4px;
+    background: rgba(255,255,255,.05);
+  }
+  .category-handle:hover { color: var(--text); background: var(--hover); }
+  .category-handle:active { cursor: grabbing; }
+  body.manage .category-handle { display: inline-flex; align-items: center; }
+  body.manage .category-header { cursor: grab; }
+  body.manage .category-header:active { cursor: grabbing; }
+  body.manage .category.dragging { opacity: .3; }
+  body.manage .category.drag-over-top {
+    box-shadow: 0 -3px 0 0 var(--accent);
+  }
+  body.manage .category.drag-over-bottom {
+    box-shadow: 0 3px 0 0 var(--accent);
   }
   .actions { display: flex; gap: 10px; flex-wrap: wrap; }
   .action {
@@ -309,6 +334,7 @@ const I18N = {
     "empty.noProjectOption": "（尚無專案）",
     "empty.noAction": "此專案還沒有動作，按「＋ 新增動作」從腳本目錄挑選。",
     "cat.uncategorized": "未分類",
+    "cat.dragHint": "拖曳調整分類順序",
     "svc.running": "運行中",
     "svc.stopped": "已停止",
     "svc.pid": "（PID {pid}）",
@@ -407,6 +433,7 @@ const I18N = {
     "empty.noProjectOption": "(No projects yet)",
     "empty.noAction": 'No actions yet — click "+ Add action" to pick from the scripts folder.',
     "cat.uncategorized": "Uncategorized",
+    "cat.dragHint": "Drag to reorder category",
     "svc.running": "Running",
     "svc.stopped": "Stopped",
     "svc.pid": "(PID {pid})",
@@ -652,14 +679,23 @@ function renderActions() {
   }
   const groups = new Map();
   for (const a of state.actions) {
-    const key = a.category || t("cat.uncategorized");
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(a);
+    const rawCat = (a.category && a.category.trim()) ? a.category.trim() : "";
+    if (!groups.has(rawCat)) groups.set(rawCat, []);
+    groups.get(rawCat).push(a);
   }
-  for (const [cat, items] of groups) {
+  for (const [rawCat, items] of groups) {
     const div = document.createElement("div");
     div.className = "category";
-    div.innerHTML = `<h2>${esc(cat)}</h2>`;
+    div.dataset.category = rawCat;
+
+    const displayCat = rawCat || t("cat.uncategorized");
+    div.innerHTML = `
+      <div class="category-header" draggable="true">
+        <span class="category-handle" title="${t("cat.dragHint")}">⠿</span>
+        <h2>${esc(displayCat)}</h2>
+      </div>`;
+    const header = div.querySelector(".category-header");
+
     const row = document.createElement("div");
     row.className = "actions";
     for (const a of items) {
@@ -676,6 +712,79 @@ function renderActions() {
       row.appendChild(card);
     }
     div.appendChild(row);
+
+    header.ondragstart = e => {
+      if (!document.body.classList.contains("manage")) {
+        e.preventDefault();
+        return;
+      }
+      window._draggedCategory = div;
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", rawCat);
+      try {
+        if (e.dataTransfer.setDragImage) {
+          e.dataTransfer.setDragImage(div, e.offsetX || 20, e.offsetY || 10);
+        }
+      } catch (_) {}
+      setTimeout(() => div.classList.add("dragging"), 0);
+    };
+    header.ondragend = () => {
+      div.classList.remove("dragging");
+      window._draggedCategory = null;
+      document.querySelectorAll(".category").forEach(c => {
+        c.classList.remove("drag-over-top", "drag-over-bottom");
+      });
+    };
+    div.ondragenter = e => {
+      if (!document.body.classList.contains("manage") || !window._draggedCategory) return;
+      e.preventDefault();
+    };
+    div.ondragover = e => {
+      if (!document.body.classList.contains("manage") || !window._draggedCategory) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      if (window._draggedCategory === div) return;
+
+      const rect = div.getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      if (e.clientY < mid) {
+        div.classList.add("drag-over-top");
+        div.classList.remove("drag-over-bottom");
+      } else {
+        div.classList.add("drag-over-bottom");
+        div.classList.remove("drag-over-top");
+      }
+    };
+    div.ondragleave = e => {
+      if (!div.contains(e.relatedTarget)) {
+        div.classList.remove("drag-over-top", "drag-over-bottom");
+      }
+    };
+    div.ondrop = async e => {
+      if (!document.body.classList.contains("manage") || !window._draggedCategory) return;
+      e.preventDefault();
+      const dragged = window._draggedCategory;
+      div.classList.remove("drag-over-top", "drag-over-bottom");
+      if (!dragged || dragged === div) return;
+
+      const rect = div.getBoundingClientRect();
+      const isBefore = e.clientY < rect.top + rect.height / 2;
+      if (isBefore) {
+        box.insertBefore(dragged, div);
+      } else {
+        box.insertBefore(dragged, div.nextSibling);
+      }
+
+      const categories = [...box.querySelectorAll(".category")].map(el => el.dataset.category || null);
+      try {
+        await api("POST", `/api/projects/${state.projectId}/categories/reorder`, { categories });
+        state.actions = await api("GET", `/api/projects/${state.projectId}/actions`);
+      } catch (err) {
+        toast(err.message);
+        await selectProject(state.projectId);
+      }
+    };
+
     box.appendChild(div);
   }
   applyButtonStates();
