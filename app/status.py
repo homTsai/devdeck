@@ -5,10 +5,10 @@ import sys
 from pathlib import Path
 
 
-async def port_listening(port: int) -> bool:
+async def _can_connect(host: str, port: int, timeout: float = 0.5) -> bool:
     try:
         _, writer = await asyncio.wait_for(
-            asyncio.open_connection("127.0.0.1", port), timeout=0.5
+            asyncio.open_connection(host, port), timeout=timeout
         )
         writer.close()
         try:
@@ -18,6 +18,16 @@ async def port_listening(port: int) -> bool:
         return True
     except (OSError, asyncio.TimeoutError):
         return False
+
+
+async def port_listening(port: int) -> bool:
+    # 同時探測 IPv4 (127.0.0.1) 與 IPv6 (::1)，避免 Node/Vite 等服務只監聽 [::1] 時誤判為已停止
+    results = await asyncio.gather(
+        _can_connect("127.0.0.1", port),
+        _can_connect("::1", port),
+        return_exceptions=True,
+    )
+    return any(r is True for r in results)
 
 
 def read_pid(pid_path: Path) -> int | None:
