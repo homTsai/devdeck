@@ -11,7 +11,7 @@ from typing import Literal
 from urllib.parse import urlparse
 
 from fastapi import Body, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -476,3 +476,11 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 @app.get("/")
 def index():
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    ico_path = STATIC_DIR / "favicon.ico"
+    if ico_path.exists():
+        return FileResponse(ico_path)
+    return Response(status_code=404)
