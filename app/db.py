@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS projects (
     name        TEXT NOT NULL,
     path        TEXT NOT NULL,
     scripts_dir TEXT NOT NULL DEFAULT 'scripts',
-    venv_path   TEXT NOT NULL DEFAULT '.venv'
+    venv_path   TEXT NOT NULL DEFAULT '.venv',
+    sort_order  INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS services (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -108,31 +109,40 @@ def _migrate():
     conn = sqlite3.connect(DB_PATH)  # 遷移期間不開 foreign_keys，避免 RENAME 干擾
     try:
         cols = {r[1] for r in conn.execute("PRAGMA table_info(actions)")}
-        if not cols:
+        proj_cols = {r[1] for r in conn.execute("PRAGMA table_info(projects)")}
+        if not cols and not proj_cols:
             return  # 全新資料庫，交給 SCHEMA 建表
-        # v1 → v2：加入 command 欄位（script_file 改為 nullable）
-        if "command" not in cols:
-            conn.executescript(MIGRATE_ADD_COMMAND)
-            conn.commit()
+        if cols:
+            # v1 → v2：加入 command 欄位（script_file 改為 nullable）
+            if "command" not in cols:
+                conn.executescript(MIGRATE_ADD_COMMAND)
+                conn.commit()
+                cols = {r[1] for r in conn.execute("PRAGMA table_info(actions)")}
+            # v2 → v3：移除 service_id，關聯改由 action_services 多對多承載（舊關聯不轉換）
+            if "service_id" in cols:
+                conn.executescript(MIGRATE_DROP_SERVICE_ID)
+                conn.commit()
+            # v3 → v4：services 加 url 欄位
+            svc_cols = {r[1] for r in conn.execute("PRAGMA table_info(services)")}
+            if svc_cols and "url" not in svc_cols:
+                conn.execute("ALTER TABLE services ADD COLUMN url TEXT")
+                conn.commit()
+            # v4 → v5：腳本動作可儲存固定附加參數
             cols = {r[1] for r in conn.execute("PRAGMA table_info(actions)")}
-        # v2 → v3：移除 service_id，關聯改由 action_services 多對多承載（舊關聯不轉換）
-        if "service_id" in cols:
-            conn.executescript(MIGRATE_DROP_SERVICE_ID)
-            conn.commit()
-        # v3 → v4：services 加 url 欄位
-        svc_cols = {r[1] for r in conn.execute("PRAGMA table_info(services)")}
-        if svc_cols and "url" not in svc_cols:
-            conn.execute("ALTER TABLE services ADD COLUMN url TEXT")
-            conn.commit()
-        # v4 → v5：腳本動作可儲存固定附加參數
-        cols = {r[1] for r in conn.execute("PRAGMA table_info(actions)")}
-        if "arguments" not in cols:
-            conn.execute("ALTER TABLE actions ADD COLUMN arguments TEXT")
-            conn.commit()
-        # v5 → v6：動作可選擇於面板或外部終端機執行
-        cols = {r[1] for r in conn.execute("PRAGMA table_info(actions)")}
-        if "execution_mode" not in cols:
-            conn.execute("ALTER TABLE actions ADD COLUMN execution_mode TEXT NOT NULL DEFAULT 'panel'")
+            if "arguments" not in cols:
+                conn.execute("ALTER TABLE actions ADD COLUMN arguments TEXT")
+                conn.commit()
+            # v5 → v6：動作可選擇於面板或外部終端機執行
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(actions)")}
+            if "execution_mode" not in cols:
+                conn.execute("ALTER TABLE actions ADD COLUMN execution_mode TEXT NOT NULL DEFAULT 'panel'")
+                conn.commit()
+        # v6 → v7：projects 新增 sort_order 欄位（依既有 name 順序填入 10, 20, ...，避免升級後順序跳動）
+        if proj_cols and "sort_order" not in proj_cols:
+            conn.execute("ALTER TABLE projects ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")
+            rows = conn.execute("SELECT id FROM projects ORDER BY name, id").fetchall()
+            for idx, (pid,) in enumerate(rows, start=1):
+                conn.execute("UPDATE projects SET sort_order=? WHERE id=?", (idx * 10, pid))
             conn.commit()
     finally:
         conn.close()

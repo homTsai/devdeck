@@ -136,6 +136,10 @@ class CategoryReorderIn(BaseModel):
     categories: list[str | None]
 
 
+class ProjectReorderIn(BaseModel):
+    project_ids: list[int]
+
+
 # ---------- helpers ----------
 
 def get_project(project_id: int) -> dict:
@@ -151,7 +155,7 @@ def get_project(project_id: int) -> dict:
 @app.get("/api/projects")
 def list_projects():
     with db.get_conn() as conn:
-        return [dict(r) for r in conn.execute("SELECT * FROM projects ORDER BY name")]
+        return [dict(r) for r in conn.execute("SELECT * FROM projects ORDER BY sort_order, name, id")]
 
 
 @app.post("/api/projects")
@@ -159,11 +163,31 @@ def create_project(body: ProjectIn):
     if not Path(body.path).is_dir():
         raise HTTPException(400, detail={"key": "err.projectPathMissing", "params": {"path": body.path}})
     with db.get_conn() as conn:
+        next_order = conn.execute("SELECT COALESCE(MAX(sort_order), 0) FROM projects").fetchone()[0] + 10
         cur = conn.execute(
-            "INSERT INTO projects (name, path, scripts_dir, venv_path) VALUES (?,?,?,?)",
-            (body.name, body.path, body.scripts_dir, body.venv_path),
+            "INSERT INTO projects (name, path, scripts_dir, venv_path, sort_order) VALUES (?,?,?,?,?)",
+            (body.name, body.path, body.scripts_dir, body.venv_path, next_order),
         )
         return {"id": cur.lastrowid}
+
+
+@app.post("/api/projects/reorder")
+def reorder_projects(body: ProjectReorderIn):
+    with db.get_conn() as conn:
+        existing = [
+            r["id"] for r in conn.execute("SELECT id FROM projects ORDER BY sort_order, name, id")
+        ]
+        existing_set = set(existing)
+        ordered_ids: list[int] = []
+        for pid in body.project_ids:
+            if pid in existing_set and pid not in ordered_ids:
+                ordered_ids.append(pid)
+        for pid in existing:
+            if pid not in ordered_ids:
+                ordered_ids.append(pid)
+        for idx, pid in enumerate(ordered_ids, start=1):
+            conn.execute("UPDATE projects SET sort_order=? WHERE id=?", (idx * 10, pid))
+    return {"ok": True}
 
 
 @app.put("/api/projects/{project_id}")
