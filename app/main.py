@@ -116,6 +116,8 @@ class ActionIn(BaseModel):
     command: str | None = None
     arguments: str | None = None
     execution_mode: Literal["panel", "terminal"] = "panel"
+    confirm_before_run: bool = False
+    confirm_message: str | None = None
     label: str
     services: list[ActionServiceLink] = []
     workdir: str | None = None
@@ -293,6 +295,13 @@ async def project_status(project_id: int):
 
 # ---------- actions ----------
 
+def _norm_confirm_message(msg: str | None) -> str | None:
+    if msg is None:
+        return None
+    cleaned = msg.replace("\r\n", "\n").strip()
+    return cleaned or None
+
+
 def _replace_links(conn, action_id: int, links: list[ActionServiceLink]):
     conn.execute("DELETE FROM action_services WHERE action_id=?", (action_id,))
     for link in links:
@@ -317,6 +326,7 @@ def list_actions(project_id: int):
             links.setdefault(r["action_id"], []).append(
                 {"service_id": r["service_id"], "disable_when": r["disable_when"]})
     for a in actions:
+        a["confirm_before_run"] = bool(a.get("confirm_before_run"))
         a["services"] = links.get(a["id"], [])
     return actions
 
@@ -325,12 +335,13 @@ def list_actions(project_id: int):
 def create_action(project_id: int, body: ActionIn):
     get_project(project_id)
     body.validate_source()
+    confirm_msg = _norm_confirm_message(body.confirm_message)
     with db.get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO actions (project_id, script_file, command, arguments, execution_mode, label, workdir, category, sort_order)"
-            " VALUES (?,?,?,?,?,?,?,?,?)",
-            (project_id, body.script_file, body.command, body.arguments, body.execution_mode, body.label,
-             body.workdir, body.category, body.sort_order),
+            "INSERT INTO actions (project_id, script_file, command, arguments, execution_mode, confirm_before_run, confirm_message, label, workdir, category, sort_order)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (project_id, body.script_file, body.command, body.arguments, body.execution_mode,
+             int(body.confirm_before_run), confirm_msg, body.label, body.workdir, body.category, body.sort_order),
         )
         _replace_links(conn, cur.lastrowid, body.services)
         return {"id": cur.lastrowid}
@@ -339,12 +350,13 @@ def create_action(project_id: int, body: ActionIn):
 @app.put("/api/actions/{action_id}")
 def update_action(action_id: int, body: ActionIn):
     body.validate_source()
+    confirm_msg = _norm_confirm_message(body.confirm_message)
     with db.get_conn() as conn:
         cur = conn.execute(
-            "UPDATE actions SET script_file=?, command=?, arguments=?, execution_mode=?, label=?, workdir=?, category=?, sort_order=?"
+            "UPDATE actions SET script_file=?, command=?, arguments=?, execution_mode=?, confirm_before_run=?, confirm_message=?, label=?, workdir=?, category=?, sort_order=?"
             " WHERE id=?",
-            (body.script_file, body.command, body.arguments, body.execution_mode, body.label, body.workdir,
-             body.category, body.sort_order, action_id),
+            (body.script_file, body.command, body.arguments, body.execution_mode,
+             int(body.confirm_before_run), confirm_msg, body.label, body.workdir, body.category, body.sort_order, action_id),
         )
         if cur.rowcount == 0:
             raise HTTPException(404, detail={"key": "err.actionNotFound"})

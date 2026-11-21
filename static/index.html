@@ -10,7 +10,7 @@
     --bg: #1e1f24; --panel: #26272e; --border: #3a3b44;
     --text: #e4e4e8; --muted: #9a9aa5; --accent: #4f8cff;
     --hover: rgba(255, 255, 255, .08);
-    --green: #3ecf6e; --red: #e05555; --gray: #6b6b75;
+    --green: #3ecf6e; --red: #e05555; --warn: #e5a93c; --gray: #6b6b75;
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }  /* 避免 display 規則蓋掉 hidden 屬性 */
@@ -26,10 +26,11 @@
     flex: none; min-width: 0;
   }
   header h1 { font-size: 16px; margin: 0 4px 0 0; color: var(--accent); flex: none; }
-  select, input, button {
+  select, input, textarea, button {
     background: var(--bg); color: var(--text);
     border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 14px;
   }
+  textarea { font-family: inherit; resize: vertical; }
   button { cursor: pointer; }
   button:hover { border-color: var(--accent); }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -185,8 +186,12 @@
     overflow: hidden;
   }
   .action > .run {
+    display: inline-flex; align-items: center; gap: 6px;
     border: none; border-radius: 0; background: none; padding: 8px 14px;
     font-size: 14px; text-align: left;
+  }
+  .confirm-badge {
+    display: inline-flex; align-items: center; color: var(--warn); opacity: .88; flex: none;
   }
   .action > .run:hover { background: rgba(79,140,255,.12); }
   .action > .run.running { color: var(--accent); }
@@ -279,9 +284,23 @@
   dialog::backdrop { background: rgba(0,0,0,.5); }
   dialog h3 { margin: 0 0 14px; font-size: 15px; }
   dialog label { display: block; margin-bottom: 10px; color: var(--muted); font-size: 13px; }
-  dialog label input, dialog label select { display: block; width: 100%; margin-top: 4px; }
-  dialog label input[type="radio"] { display: inline; width: auto; margin: 0; }
+  dialog label input, dialog label select, dialog label textarea { display: block; width: 100%; margin-top: 4px; }
+  dialog label input[type="radio"], dialog label input[type="checkbox"] { display: inline; width: auto; margin: 0; }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; color: var(--text); cursor: pointer; margin: 4px 0 8px; }
   dialog .btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  #confirm-run-dialog { width: min(480px, calc(100vw - 32px)); min-width: 0; max-width: 100%; }
+  .confirm-head { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }
+  .confirm-head h3 { margin: 0; flex: 1; min-width: 0; }
+  .confirm-head-icon { display: inline-flex; align-items: center; color: var(--warn); flex: none; }
+  .confirm-message { margin: 0 0 14px; color: var(--text); line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; }
+  .confirm-meta {
+    margin: 0; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; font-size: 13px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .confirm-meta-row { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+  .confirm-meta dt { color: var(--muted); margin: 0; }
+  .confirm-meta dd { margin: 0; color: var(--text); overflow-wrap: anywhere; word-break: break-word; }
+  .confirm-meta code { font-family: Consolas, monospace; font-size: 12px; color: var(--text); }
   #action-dialog { width: min(900px, calc(100vw - 40px)); max-height: calc(100vh - 40px); overflow-y: auto; }
   .action-form-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
   .action-form-column { min-width: 0; }
@@ -436,6 +455,17 @@
           <input id="a-workdir">
           <button type="button" class="browse" id="browse-a-workdir" data-i18n="common.browse">瀏覽…</button>
         </span></label>
+      <fieldset>
+        <legend data-i18n="act.confirmLegend">執行前確認</legend>
+        <label class="checkbox-row">
+          <input type="checkbox" id="a-confirm-before-run">
+          <span data-i18n="act.confirmBeforeRun">按下按鈕時顯示確認對話框（防止誤觸）</span>
+        </label>
+        <label id="a-confirm-message-row" hidden>
+          <span data-i18n="act.confirmMessage">自訂確認訊息（選填，未填寫時顯示預設訊息）</span>
+          <textarea id="a-confirm-message" rows="3" data-i18n-placeholder="act.confirmMessagePlaceholder" placeholder="例如：將部署至正式環境，請確認測試皆已通過。"></textarea>
+        </label>
+      </fieldset>
     </section>
   </div>
   <div class="btns">
@@ -443,6 +473,44 @@
     <span class="spacer"></span>
     <button onclick="document.getElementById('action-dialog').close()" data-i18n="common.cancel">取消</button>
     <button id="btn-save-action" class="primary" data-i18n="common.save">儲存</button>
+  </div>
+</dialog>
+
+<!-- 執行前確認 dialog -->
+<dialog id="confirm-run-dialog" aria-labelledby="confirm-run-title" aria-describedby="confirm-run-message">
+  <div class="confirm-head">
+    <span class="confirm-head-icon" aria-hidden="true">
+      <svg viewBox="0 0 16 16" width="18" height="18"><path fill="currentColor" d="M8 1.5L2.5 3.8v3.9c0 3.4 2.3 6.3 5.5 7.3 3.2-1 5.5-3.9 5.5-7.3V3.8L8 1.5zm0 1.4l4.1 1.7v3.1c0 2.7-1.7 5-4.1 5.9-2.4-.9-4.1-3.2-4.1-5.9V4.6L8 2.9zm-.7 2.4v3.4h1.4V5.3H7.3zm0 4.4v1.4h1.4V9.7H7.3z"/></svg>
+    </span>
+    <h3 id="confirm-run-title" data-i18n="confirmRun.title">確認執行動作</h3>
+    <button type="button" id="btn-confirm-run-close" class="icon-btn" data-i18n-title="confirmRun.close" data-i18n-aria-label="confirmRun.close" title="關閉對話框" aria-label="關閉對話框">✕</button>
+  </div>
+  <p id="confirm-run-message" class="confirm-message"></p>
+  <dl class="confirm-meta">
+    <div class="confirm-meta-row">
+      <dt data-i18n="confirmRun.project">專案</dt>
+      <dd id="confirm-run-project"></dd>
+    </div>
+    <div class="confirm-meta-row">
+      <dt data-i18n="confirmRun.action">動作</dt>
+      <dd id="confirm-run-action"></dd>
+    </div>
+    <div class="confirm-meta-row">
+      <dt data-i18n="confirmRun.command">指令</dt>
+      <dd><code id="confirm-run-command"></code></dd>
+    </div>
+    <div class="confirm-meta-row">
+      <dt data-i18n="confirmRun.mode">執行方式</dt>
+      <dd id="confirm-run-mode"></dd>
+    </div>
+    <div class="confirm-meta-row" id="confirm-run-workdir-row" hidden>
+      <dt data-i18n="confirmRun.workdir">工作目錄</dt>
+      <dd><code id="confirm-run-workdir"></code></dd>
+    </div>
+  </dl>
+  <div class="btns">
+    <button type="button" id="btn-confirm-run-cancel" data-i18n="common.cancel">取消</button>
+    <button type="button" id="btn-confirm-run-ok" class="primary" data-i18n="confirmRun.confirm">確定執行</button>
   </div>
 </dialog>
 
@@ -512,6 +580,11 @@ const I18N = {
     "act.category": "分類（選填）",
     "act.svcLegend": "按鈕狀態關聯（勾選的條件「全部成立」時停用此按鈕）",
     "act.workdir": "工作目錄（選填，預設為專案路徑）",
+    "act.confirmLegend": "執行前確認",
+    "act.confirmBeforeRun": "按下按鈕時顯示確認對話框（防止誤觸）",
+    "act.confirmMessage": "自訂確認訊息（選填，未填寫時顯示預設訊息）",
+    "act.confirmMessagePlaceholder": "例如：將部署至正式環境，請確認測試皆已通過。",
+    "act.confirmBadgeTitle": "執行前將顯示確認對話框",
     "act.sort": "排序（數字小的在前）",
     "act.del": "刪除動作",
     "act.noScript": "（無可新增的腳本）",
@@ -539,6 +612,15 @@ const I18N = {
     "confirm.delProject": "刪除專案「{name}」及其所有動作設定？（不會動到專案檔案本身）",
     "confirm.delAction": "刪除動作「{label}」？",
     "confirm.shutdown": "關閉 devdeck 伺服器？（不影響已啟動的專案服務）",
+    "confirmRun.title": "確認執行動作",
+    "confirmRun.defaultMessage": "確定要在「{project}」執行「{label}」嗎？",
+    "confirmRun.project": "專案",
+    "confirmRun.action": "動作",
+    "confirmRun.command": "指令",
+    "confirmRun.mode": "執行方式",
+    "confirmRun.workdir": "工作目錄",
+    "confirmRun.confirm": "確定執行",
+    "confirmRun.close": "關閉對話框",
     "shutdown.done": "devdeck 已關閉，此分頁可以關掉了。",
     "auth.lost": "驗證失效：請重新點一次 devdeck 啟動捷徑取得授權。",
     "auth.lostHint": "Token missing or invalid — launch devdeck from its shortcut/launcher again.",
@@ -621,6 +703,11 @@ const I18N = {
     "act.category": "Category (optional)",
     "act.svcLegend": "Button-state links (disable this button when all checked conditions hold)",
     "act.workdir": "Working directory (optional, defaults to project path)",
+    "act.confirmLegend": "Confirmation before run",
+    "act.confirmBeforeRun": "Show confirmation dialog before running (prevent accidental clicks)",
+    "act.confirmMessage": "Custom confirmation message (optional; defaults to a standard prompt when blank)",
+    "act.confirmMessagePlaceholder": "e.g., This will deploy to production. Confirm all checks have passed.",
+    "act.confirmBadgeTitle": "Requires confirmation before running",
     "act.sort": "Sort order (smaller numbers first)",
     "act.del": "Delete action",
     "act.noScript": "(No scripts available to add)",
@@ -648,6 +735,15 @@ const I18N = {
     "confirm.delProject": 'Delete project "{name}" and all its action settings? (Project files are left untouched.)',
     "confirm.delAction": 'Delete action "{label}"?',
     "confirm.shutdown": "Shut down the devdeck server? (Running project services are unaffected.)",
+    "confirmRun.title": "Confirm action",
+    "confirmRun.defaultMessage": 'Run "{label}" in "{project}"?',
+    "confirmRun.project": "Project",
+    "confirmRun.action": "Action",
+    "confirmRun.command": "Command",
+    "confirmRun.mode": "Run mode",
+    "confirmRun.workdir": "Working dir",
+    "confirmRun.confirm": "Confirm & run",
+    "confirmRun.close": "Close dialog",
     "shutdown.done": "devdeck has shut down — you can close this tab.",
     "auth.lost": "Authentication lost: click the devdeck launcher shortcut again to re-authorize.",
     "auth.lostHint": "Token missing or invalid — launch devdeck from its shortcut/launcher again.",
@@ -694,6 +790,7 @@ function applyStaticI18n(root = document) {
   root.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
   root.querySelectorAll("[data-i18n-title]").forEach(el => { el.title = t(el.dataset.i18nTitle); });
   root.querySelectorAll("[data-i18n-placeholder]").forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+  root.querySelectorAll("[data-i18n-aria-label]").forEach(el => { el.setAttribute("aria-label", t(el.dataset.i18nAriaLabel)); });
 }
 
 function renderOutputTitle() {
@@ -1050,6 +1147,12 @@ function esc(s) {
     c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+function formatActionCommand(a) {
+  return a.script_file
+    ? a.script_file + (a.arguments ? " " + a.arguments : "")
+    : "$ " + (a.command || "");
+}
+
 function renderActions() {
   const box = $("action-list");
   box.innerHTML = "";
@@ -1082,11 +1185,14 @@ function renderActions() {
     for (const a of items) {
       const card = document.createElement("div");
       card.className = "action";
-      const cmdText = a.script_file
-        ? a.script_file + (a.arguments ? " " + a.arguments : "")
-        : "$ " + (a.command || "");
+      const cmdText = formatActionCommand(a);
+      const confirmTitle = t("act.confirmBadgeTitle");
+      const btnTitle = a.confirm_before_run ? `${cmdText}\n${confirmTitle}` : cmdText;
+      const confirmBadge = a.confirm_before_run
+        ? `<span class="confirm-badge" title="${esc(confirmTitle)}" aria-label="${esc(confirmTitle)}"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M8 1.5L2.5 3.8v3.9c0 3.4 2.3 6.3 5.5 7.3 3.2-1 5.5-3.9 5.5-7.3V3.8L8 1.5zm0 1.4l4.1 1.7v3.1c0 2.7-1.7 5-4.1 5.9-2.4-.9-4.1-3.2-4.1-5.9V4.6L8 2.9zm-.7 2.4v3.4h1.4V5.3H7.3zm0 4.4v1.4h1.4V9.7H7.3z"/></svg></span>`
+        : "";
       card.innerHTML = `
-        <button class="run" data-id="${a.id}" title="${esc(cmdText)}">${esc(a.label)}</button>
+        <button class="run" data-id="${a.id}" title="${esc(btnTitle)}"><span class="run-label">${esc(a.label)}</span>${confirmBadge}</button>
         <span class="mgmt">
           <button class="edit" data-id="${a.id}">${t("common.edit")}</button>
         </span>`;
@@ -1206,12 +1312,57 @@ function handleRunEvent(block) {
   }
 }
 
+let _confirmRunResolve = null;
+
+function finishConfirmRun(confirmed) {
+  const dlg = $("confirm-run-dialog");
+  const resolve = _confirmRunResolve;
+  _confirmRunResolve = null;
+  if (dlg && dlg.open) dlg.close();
+  if (resolve) resolve(Boolean(confirmed));
+}
+
+function confirmRunAction(action) {
+  const dlg = $("confirm-run-dialog");
+  if (!dlg || dlg.open) return Promise.resolve(false);
+  const projectName = currentProject()?.name || "";
+  const customMsg = action.confirm_message && action.confirm_message.trim();
+  $("confirm-run-message").textContent = customMsg
+    ? customMsg
+    : t("confirmRun.defaultMessage", { project: projectName, label: action.label });
+  $("confirm-run-project").textContent = projectName;
+  $("confirm-run-action").textContent = action.label;
+  $("confirm-run-command").textContent = formatActionCommand(action);
+  $("confirm-run-mode").textContent = t(
+    action.execution_mode === "terminal" ? "act.executionTerminal" : "act.executionPanel"
+  );
+  const workdir = action.workdir && action.workdir.trim();
+  $("confirm-run-workdir-row").hidden = !workdir;
+  $("confirm-run-workdir").textContent = workdir || "";
+
+  return new Promise(resolve => {
+    _confirmRunResolve = resolve;
+    dlg.showModal();
+    $("btn-confirm-run-cancel").focus();
+  });
+}
+
 async function runAction(id, btn) {
   // 用 fetch POST 讀 SSE（不用 EventSource：它只能 GET，而 GET 端點擋不住跨站觸發）
+  if (btn.disabled) return;
+  let action = state.actions.find(a => a.id === id);
+  if (action?.confirm_before_run) {
+    const ok = await confirmRunAction(action);
+    if (!ok) return;
+    const freshBtn = document.querySelector(`button.run[data-id="${id}"]`);
+    const freshAction = state.actions.find(a => a.id === id);
+    if (!freshAction || !freshBtn || freshBtn.disabled) return;
+    btn = freshBtn;
+    action = freshAction;
+  }
   if (state.runAbort) state.runAbort.abort();
   document.querySelectorAll(".run.running").forEach(b => b.classList.remove("running"));
   btn.classList.add("running");
-  const action = state.actions.find(a => a.id === id);
   const isTerminal = action?.execution_mode === "terminal";
   state.outputProjectName = currentProject()?.name || null;
   state.outputLabel = action ? action.label : btn.childNodes[0].textContent.trim();
@@ -1390,10 +1541,18 @@ async function openActionDialog(actionId) {
   $("a-category").value = a?.category || "";
   $("a-workdir").value = a?.workdir || "";
   $("a-workdir").placeholder = currentProject()?.path || "";
+  $("a-confirm-before-run").checked = Boolean(a?.confirm_before_run);
+  $("a-confirm-message").value = a?.confirm_message || "";
+  syncConfirmFields();
   $("a-sort").value = a?.sort_order ?? 0;
   $("btn-del-action").hidden = !a;
   $("action-dialog").showModal();
 }
+
+function syncConfirmFields() {
+  $("a-confirm-message-row").hidden = !$("a-confirm-before-run").checked;
+}
+$("a-confirm-before-run").onchange = syncConfirmFields;
 
 function setActionType(t) {
   document.querySelector(`input[name="a-type"][value="${t}"]`).checked = true;
@@ -1412,6 +1571,8 @@ async function saveAction() {
     command: type === "command" ? ($("a-command").value.trim() || null) : null,
     arguments: type === "script" ? ($("a-arguments").value.trim() || null) : null,
     execution_mode: document.querySelector('input[name="a-execution-mode"]:checked').value,
+    confirm_before_run: $("a-confirm-before-run").checked,
+    confirm_message: $("a-confirm-message").value.trim() || null,
     label: $("a-label").value.trim(),
     category: $("a-category").value.trim() || null,
     services: [...document.querySelectorAll("#a-services .l-check:checked")].map(ch => ({
@@ -1554,6 +1715,20 @@ $("btn-del-project").onclick = async () => {
 $("btn-add-svc").onclick = e => { e.preventDefault(); $("svc-rows").appendChild(svcRow()); };
 $("btn-add-action").onclick = () => openActionDialog(null);
 $("btn-save-action").onclick = saveAction;
+$("btn-confirm-run-ok").onclick = () => finishConfirmRun(true);
+$("btn-confirm-run-cancel").onclick = () => finishConfirmRun(false);
+$("btn-confirm-run-close").onclick = () => finishConfirmRun(false);
+$("confirm-run-dialog").addEventListener("close", () => {
+  if (_confirmRunResolve) finishConfirmRun(false);
+});
+$("confirm-run-dialog").addEventListener("click", e => {
+  const dlg = $("confirm-run-dialog");
+  if (e.target !== dlg) return;
+  const rect = dlg.getBoundingClientRect();
+  const outside = e.clientX < rect.left || e.clientX > rect.right
+    || e.clientY < rect.top || e.clientY > rect.bottom;
+  if (outside) finishConfirmRun(false);
+});
 $("btn-del-action").onclick = async () => {
   const a = state.actions.find(x => x.id === state.editingActionId);
   if (!confirm(t("confirm.delAction", { label: a.label }))) return;
