@@ -138,6 +138,11 @@ class CategoryReorderIn(BaseModel):
     categories: list[str | None]
 
 
+class CategoryRenameIn(BaseModel):
+    old_category: str | None = None
+    new_category: str | None = None
+
+
 class ProjectReorderIn(BaseModel):
     project_ids: list[int]
 
@@ -302,6 +307,13 @@ def _norm_confirm_message(msg: str | None) -> str | None:
     return cleaned or None
 
 
+def _norm_category(cat: str | None) -> str | None:
+    if cat is None:
+        return None
+    cleaned = cat.strip()
+    return cleaned or None
+
+
 def _replace_links(conn, action_id: int, links: list[ActionServiceLink]):
     conn.execute("DELETE FROM action_services WHERE action_id=?", (action_id,))
     for link in links:
@@ -383,12 +395,12 @@ def reorder_categories(project_id: int, body: CategoryReorderIn):
         )]
         groups: dict[str | None, list[dict]] = {}
         for a in actions:
-            cat = a["category"].strip() if a["category"] and a["category"].strip() else None
+            cat = _norm_category(a["category"])
             groups.setdefault(cat, []).append(a)
 
         ordered_keys: list[str | None] = []
         for c in body.categories:
-            norm_c = c.strip() if c and c.strip() else None
+            norm_c = _norm_category(c)
             if norm_c not in ordered_keys:
                 ordered_keys.append(norm_c)
 
@@ -407,6 +419,58 @@ def reorder_categories(project_id: int, body: CategoryReorderIn):
                 current_sort += 10
             current_sort += 10
     return {"ok": True}
+
+
+@app.post("/api/projects/{project_id}/categories/rename")
+def rename_category(project_id: int, body: CategoryRenameIn):
+    get_project(project_id)
+    old_cat = _norm_category(body.old_category)
+    new_cat = _norm_category(body.new_category)
+    with db.get_conn() as conn:
+        actions = [dict(r) for r in conn.execute(
+            "SELECT id, category, sort_order FROM actions WHERE project_id=? ORDER BY sort_order, id",
+            (project_id,)
+        )]
+        groups: dict[str | None, list[dict]] = {}
+        for a in actions:
+            cat = _norm_category(a["category"])
+            groups.setdefault(cat, []).append(a)
+
+        source_actions = groups.get(old_cat, [])
+        if not source_actions:
+            return {"ok": True, "updated": 0, "merged": False}
+
+        if old_cat == new_cat:
+            for act in source_actions:
+                if act["category"] != new_cat:
+                    conn.execute(
+                        "UPDATE actions SET category=? WHERE id=? AND project_id=?",
+                        (new_cat, act["id"], project_id),
+                    )
+            return {"ok": True, "updated": 0, "merged": False}
+
+        merged = new_cat in groups
+        for act in source_actions:
+            conn.execute(
+                "UPDATE actions SET category=? WHERE id=? AND project_id=?",
+                (new_cat, act["id"], project_id),
+            )
+
+        if merged:
+            current_sort = 10
+            for cat, cat_actions in groups.items():
+                if cat == old_cat:
+                    continue
+                ordered_group = cat_actions + source_actions if cat == new_cat else cat_actions
+                for act in ordered_group:
+                    conn.execute(
+                        "UPDATE actions SET sort_order=? WHERE id=? AND project_id=?",
+                        (current_sort, act["id"], project_id),
+                    )
+                    current_sort += 10
+                current_sort += 10
+
+    return {"ok": True, "updated": len(source_actions), "merged": merged}
 
 
 # ---------- run (SSE) ----------

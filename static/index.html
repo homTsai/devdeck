@@ -170,6 +170,16 @@
   .category-handle:hover { color: var(--text); background: var(--hover); }
   .category-handle:active { cursor: grabbing; }
   body.manage .category-handle { display: inline-flex; align-items: center; }
+  .category-edit {
+    display: none; border: none; background: transparent; color: var(--muted);
+    padding: 2px 5px; border-radius: 4px; cursor: pointer; line-height: 1;
+  }
+  .category-edit:hover, .category-edit:focus-visible {
+    color: var(--text); background: var(--hover); outline: none;
+  }
+  body.manage .category-edit {
+    display: inline-flex; align-items: center; justify-content: center;
+  }
   body.manage .category-header { cursor: grab; }
   body.manage .category-header:active { cursor: grabbing; }
   body.manage .category.dragging { opacity: .3; }
@@ -301,6 +311,9 @@
   .confirm-meta dt { color: var(--muted); margin: 0; }
   .confirm-meta dd { margin: 0; color: var(--text); overflow-wrap: anywhere; word-break: break-word; }
   .confirm-meta code { font-family: Consolas, monospace; font-size: 12px; color: var(--text); }
+  #category-dialog { width: min(440px, calc(100vw - 32px)); min-width: 0; max-width: 100%; }
+  .cat-dialog-meta { margin: 0 0 12px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .cat-dialog-hint { margin: -2px 0 0; font-size: 12px; color: var(--warn); line-height: 1.45; }
   #action-dialog { width: min(900px, calc(100vw - 40px)); max-height: calc(100vh - 40px); overflow-y: auto; }
   .action-form-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
   .action-form-column { min-width: 0; }
@@ -514,6 +527,22 @@
   </div>
 </dialog>
 
+<!-- 編輯分類 dialog -->
+<dialog id="category-dialog" aria-labelledby="cat-dlg-title">
+  <h3 id="cat-dlg-title" data-i18n="cat.editTitle">編輯分類</h3>
+  <p id="cat-dlg-meta" class="cat-dialog-meta"></p>
+  <label>
+    <span data-i18n="cat.nameLabel">分類名稱</span>
+    <input id="cat-name-input" list="cat-rename-list" autocomplete="off">
+    <datalist id="cat-rename-list"></datalist>
+  </label>
+  <p id="cat-dlg-hint" class="cat-dialog-hint" hidden></p>
+  <div class="btns">
+    <button type="button" id="btn-cancel-category" data-i18n="common.cancel">取消</button>
+    <button type="button" id="btn-save-category" class="primary" data-i18n="common.save">儲存</button>
+  </div>
+</dialog>
+
 <script>
 const $ = id => document.getElementById(id);
 
@@ -596,6 +625,15 @@ const I18N = {
     "empty.noAction": "此專案還沒有動作，按「＋ 新增動作」從腳本目錄挑選。",
     "cat.uncategorized": "未分類",
     "cat.dragHint": "拖曳調整分類順序",
+    "cat.editHint": "編輯分類名稱",
+    "cat.editTitle": "編輯分類",
+    "cat.nameLabel": "分類名稱",
+    "cat.placeholderNamed": "輸入新分類名稱（留空將移除分類）",
+    "cat.placeholderUncategorized": "輸入分類名稱，或選擇既有分類",
+    "cat.metaNamed": "將統一修改「{name}」下的 {count} 個動作之分類。",
+    "cat.metaUncategorized": "將為「未分類」下的 {count} 個動作設定分類。",
+    "cat.hintClear": "留空儲存將移除此分類，這 {count} 個動作會歸入「未分類」。",
+    "cat.hintMerge": "分類「{target}」已存在，儲存後會將這 {count} 個動作合併至「{target}」的按鈕後方。",
     "svc.running": "運行中",
     "svc.stopped": "已停止",
     "svc.pid": "（PID {pid}）",
@@ -611,6 +649,8 @@ const I18N = {
     "confirm.delSvc": "刪除服務「{name}」？",
     "confirm.delProject": "刪除專案「{name}」及其所有動作設定？（不會動到專案檔案本身）",
     "confirm.delAction": "刪除動作「{label}」？",
+    "confirm.clearCategory": "確定要移除分類「{name}」嗎？其下的 {count} 個動作將歸入「未分類」。",
+    "confirm.mergeCategory": "分類「{to}」已存在，確定要將「{from}」下的 {count} 個動作合併到「{to}」後方嗎？",
     "confirm.shutdown": "關閉 devdeck 伺服器？（不影響已啟動的專案服務）",
     "confirmRun.title": "確認執行動作",
     "confirmRun.defaultMessage": "確定要在「{project}」執行「{label}」嗎？",
@@ -719,6 +759,15 @@ const I18N = {
     "empty.noAction": 'No actions yet — click "+ Add action" to pick from the scripts folder.',
     "cat.uncategorized": "Uncategorized",
     "cat.dragHint": "Drag to reorder category",
+    "cat.editHint": "Edit category name",
+    "cat.editTitle": "Edit category",
+    "cat.nameLabel": "Category name",
+    "cat.placeholderNamed": "Enter a new category name (leave blank to uncategorize)",
+    "cat.placeholderUncategorized": "Enter a category name, or pick an existing one",
+    "cat.metaNamed": 'This will update the category for {count} action(s) under "{name}".',
+    "cat.metaUncategorized": 'This will assign a category to {count} action(s) under "Uncategorized".',
+    "cat.hintClear": 'Leaving this blank will remove the category and move {count} action(s) to "Uncategorized".',
+    "cat.hintMerge": 'Category "{target}" already exists; saving will merge {count} action(s) after its existing buttons.',
     "svc.running": "Running",
     "svc.stopped": "Stopped",
     "svc.pid": "(PID {pid})",
@@ -734,6 +783,8 @@ const I18N = {
     "confirm.delSvc": 'Delete service "{name}"?',
     "confirm.delProject": 'Delete project "{name}" and all its action settings? (Project files are left untouched.)',
     "confirm.delAction": 'Delete action "{label}"?',
+    "confirm.clearCategory": 'Remove category "{name}"? Its {count} action(s) will be moved to "Uncategorized".',
+    "confirm.mergeCategory": 'Category "{to}" already exists. Merge {count} action(s) from "{from}" after "{to}"?',
     "confirm.shutdown": "Shut down the devdeck server? (Running project services are unaffected.)",
     "confirmRun.title": "Confirm action",
     "confirmRun.defaultMessage": 'Run "{label}" in "{project}"?',
@@ -840,7 +891,7 @@ const _savedOutW = Number(localStorage.getItem("devdeck.outputWidth"));
 const state = {
   projects: [], projectId: null, services: [], actions: [], scan: [],
   status: new Map(),  // service_id -> listening(bool)
-  editingActionId: null, editingProject: false, statusTimer: null, runAbort: null,
+  editingActionId: null, editingCategory: null, editingProject: false, statusTimer: null, runAbort: null,
   outputLabel: null, outputProjectName: null,  // 目前輸出面板顯示的動作與來源專案名稱
   sidebarCollapsedWide: localStorage.getItem("devdeck.sidebarCollapsedWide") === "1",
   sidebarDrawerOpen: false,
@@ -1153,6 +1204,10 @@ function formatActionCommand(a) {
     : "$ " + (a.command || "");
 }
 
+function normCategory(cat) {
+  return (cat && cat.trim()) ? cat.trim() : "";
+}
+
 function renderActions() {
   const box = $("action-list");
   box.innerHTML = "";
@@ -1163,7 +1218,7 @@ function renderActions() {
   }
   const groups = new Map();
   for (const a of state.actions) {
-    const rawCat = (a.category && a.category.trim()) ? a.category.trim() : "";
+    const rawCat = normCategory(a.category);
     if (!groups.has(rawCat)) groups.set(rawCat, []);
     groups.get(rawCat).push(a);
   }
@@ -1175,8 +1230,11 @@ function renderActions() {
     const displayCat = rawCat || t("cat.uncategorized");
     div.innerHTML = `
       <div class="category-header" draggable="true">
-        <span class="category-handle" title="${t("cat.dragHint")}">⠿</span>
+        <span class="category-handle" title="${esc(t("cat.dragHint"))}">⠿</span>
         <h2>${esc(displayCat)}</h2>
+        <button type="button" class="category-edit" draggable="false" title="${esc(t("cat.editHint"))}" aria-label="${esc(t("cat.editHint"))}">
+          <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M12.146 1.854a1.5 1.5 0 0 1 2.122 2.121l-8.5 8.5a.5.5 0 0 1-.22.13l-3 1a.5.5 0 0 1-.633-.633l1-3a.5.5 0 0 1 .13-.22l8.5-8.5zm1.414.707a.5.5 0 0 0-.707 0L11.707 3.707l.586.586 1.146-1.146a.5.5 0 0 0 0-.707zM11 4.414l-7.646 7.646-.53 1.59 1.59-.53L12.06 5.475 11 4.414z"/></svg>
+        </button>
       </div>`;
     const header = div.querySelector(".category-header");
 
@@ -1201,7 +1259,8 @@ function renderActions() {
     div.appendChild(row);
 
     header.ondragstart = e => {
-      if (!document.body.classList.contains("manage")) {
+      if (!document.body.classList.contains("manage")
+          || (e.target && e.target.closest && e.target.closest(".category-edit"))) {
         e.preventDefault();
         return;
       }
@@ -1593,6 +1652,92 @@ async function saveAction() {
   } catch (e) { toast(e.message); }
 }
 
+function getCategoryStats(cat) {
+  const target = normCategory(cat);
+  let count = 0;
+  const existingCats = new Set();
+  for (const a of state.actions) {
+    const c = normCategory(a.category);
+    if (c === target) count += 1;
+    if (c) existingCats.add(c);
+  }
+  return { count, existingCats };
+}
+
+function updateCategoryDialogHint() {
+  if (state.editingCategory === null) return;
+  const oldCat = state.editingCategory;
+  const nextCat = normCategory($("cat-name-input").value);
+  const { count, existingCats } = getCategoryStats(oldCat);
+  const hintEl = $("cat-dlg-hint");
+  if (oldCat !== "" && nextCat === "") {
+    hintEl.textContent = t("cat.hintClear", { count });
+    hintEl.hidden = false;
+  } else if (nextCat !== "" && nextCat !== oldCat && existingCats.has(nextCat)) {
+    hintEl.textContent = t("cat.hintMerge", { target: nextCat, count });
+    hintEl.hidden = false;
+  } else {
+    hintEl.textContent = "";
+    hintEl.hidden = true;
+  }
+}
+
+function openCategoryDialog(rawCat) {
+  state.editingCategory = normCategory(rawCat);
+  const { count, existingCats } = getCategoryStats(state.editingCategory);
+  const dl = $("cat-rename-list");
+  dl.innerHTML = "";
+  for (const c of existingCats) {
+    if (c === state.editingCategory) continue;
+    const opt = document.createElement("option");
+    opt.value = c;
+    dl.appendChild(opt);
+  }
+  $("cat-dlg-meta").textContent = state.editingCategory
+    ? t("cat.metaNamed", { name: state.editingCategory, count })
+    : t("cat.metaUncategorized", { count });
+  const input = $("cat-name-input");
+  input.value = state.editingCategory;
+  input.placeholder = state.editingCategory
+    ? t("cat.placeholderNamed")
+    : t("cat.placeholderUncategorized");
+  updateCategoryDialogHint();
+  $("category-dialog").showModal();
+  input.focus();
+  input.select();
+}
+
+async function saveCategory() {
+  if (state.editingCategory === null) return;
+  const oldCat = state.editingCategory;
+  const newCat = normCategory($("cat-name-input").value);
+  if (oldCat === newCat) {
+    $("category-dialog").close();
+    return;
+  }
+  const { count, existingCats } = getCategoryStats(oldCat);
+  if (oldCat !== "" && newCat === "") {
+    if (!confirm(t("confirm.clearCategory", { name: oldCat, count }))) return;
+  } else if (newCat !== "" && existingCats.has(newCat)) {
+    if (!confirm(t("confirm.mergeCategory", { from: oldCat || t("cat.uncategorized"), to: newCat, count }))) return;
+  }
+  const saveBtn = $("btn-save-category");
+  saveBtn.disabled = true;
+  try {
+    await api("POST", `/api/projects/${state.projectId}/categories/rename`, {
+      old_category: oldCat || null,
+      new_category: newCat || null,
+    });
+    $("category-dialog").close();
+    state.actions = await api("GET", `/api/projects/${state.projectId}/actions`);
+    renderActions();
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    saveBtn.disabled = false;
+  }
+}
+
 /* ---------- 事件繫結 ---------- */
 
 $("btn-sidebar-toggle").onclick = () => {
@@ -1729,6 +1874,26 @@ $("confirm-run-dialog").addEventListener("click", e => {
     || e.clientY < rect.top || e.clientY > rect.bottom;
   if (outside) finishConfirmRun(false);
 });
+$("cat-name-input").addEventListener("input", updateCategoryDialogHint);
+$("cat-name-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    saveCategory();
+  }
+});
+$("btn-save-category").onclick = saveCategory;
+$("btn-cancel-category").onclick = () => $("category-dialog").close();
+$("category-dialog").addEventListener("close", () => {
+  state.editingCategory = null;
+});
+$("category-dialog").addEventListener("click", e => {
+  const dlg = $("category-dialog");
+  if (e.target !== dlg) return;
+  const rect = dlg.getBoundingClientRect();
+  const outside = e.clientX < rect.left || e.clientX > rect.right
+    || e.clientY < rect.top || e.clientY > rect.bottom;
+  if (outside) dlg.close();
+});
 $("btn-del-action").onclick = async () => {
   const a = state.actions.find(x => x.id === state.editingActionId);
   if (!confirm(t("confirm.delAction", { label: a.label }))) return;
@@ -1762,6 +1927,11 @@ $("action-list").addEventListener("click", e => {
   if (runBtn) return runAction(Number(runBtn.dataset.id), runBtn);
   const editBtn = e.target.closest("button.edit");
   if (editBtn) return openActionDialog(Number(editBtn.dataset.id));
+  const catEditBtn = e.target.closest("button.category-edit");
+  if (catEditBtn) {
+    e.stopPropagation();
+    openCategoryDialog(catEditBtn.closest(".category")?.dataset.category || "");
+  }
 });
 
 /* ---------- 資料夾選擇器 ---------- */
