@@ -203,6 +203,9 @@
   .confirm-badge {
     display: inline-flex; align-items: center; color: var(--warn); opacity: .88; flex: none;
   }
+  .admin-badge {
+    display: inline-flex; align-items: center; color: var(--accent); opacity: .92; flex: none;
+  }
   .action > .run:hover { background: rgba(79,140,255,.12); }
   .action > .run.running { color: var(--accent); }
   .action > .run:disabled { opacity: .35; cursor: not-allowed; }
@@ -297,6 +300,9 @@
   dialog label input, dialog label select, dialog label textarea { display: block; width: 100%; margin-top: 4px; }
   dialog label input[type="radio"], dialog label input[type="checkbox"] { display: inline; width: auto; margin: 0; }
   .checkbox-row { display: flex; align-items: center; gap: 8px; color: var(--text); cursor: pointer; margin: 4px 0 8px; }
+  .admin-option-row { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+  .admin-option-row.disabled { opacity: .5; cursor: not-allowed; }
+  .field-hint { display: block; margin: -2px 0 2px; font-size: 12px; color: var(--muted); line-height: 1.45; }
   dialog .btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
   #confirm-run-dialog { width: min(480px, calc(100vw - 32px)); min-width: 0; max-width: 100%; }
   .confirm-head { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }
@@ -462,6 +468,11 @@
         <legend data-i18n="act.executionLegend">執行方式</legend>
         <label style="margin:0"><input type="radio" name="a-execution-mode" value="panel" checked> <span data-i18n="act.executionPanel">面板執行（預設）</span></label>
         <label style="margin:0"><input type="radio" name="a-execution-mode" value="terminal"> <span data-i18n="act.executionTerminal">外部終端機（可互動輸入）</span></label>
+        <label class="checkbox-row admin-option-row" id="a-run-as-admin-row">
+          <input type="checkbox" id="a-run-as-admin">
+          <span data-i18n="act.runAsAdmin">以管理員身分執行（僅限外部終端機）</span>
+        </label>
+        <small class="field-hint" id="a-run-as-admin-hint"></small>
       </fieldset>
       <label><span data-i18n="act.workdir">工作目錄（選填，預設為專案路徑）</span>
         <span class="path-field">
@@ -605,6 +616,11 @@ const I18N = {
     "act.executionLegend": "執行方式",
     "act.executionPanel": "面板執行（預設）",
     "act.executionTerminal": "外部終端機（可互動輸入）",
+    "act.executionTerminalAdmin": "外部終端機（以管理員身分執行）",
+    "act.runAsAdmin": "以管理員身分執行（僅限外部終端機）",
+    "act.runAsAdminHint": "Windows 將彈出系統 UAC 授權；macOS 將於外部終端機以 sudo 執行。",
+    "act.runAsAdminNeedTerminal": "請先切換為「外部終端機」以啟用管理員身分執行。",
+    "act.adminBadgeTitle": "將以管理員身分於外部終端機執行",
     "act.displayName": "顯示名稱",
     "act.category": "分類（選填）",
     "act.svcLegend": "按鈕狀態關聯（勾選的條件「全部成立」時停用此按鈕）",
@@ -641,6 +657,7 @@ const I18N = {
     "svc.open": "開啟 ↗",
     "run.done": "— 結束，exit code {code} —",
     "run.terminalOpened": "— 已於外部終端機開啟；輸出與互動輸入請在該視窗進行。—",
+    "run.terminalAdminOpened": "— 已以管理員身分於外部終端機開啟；輸出與互動輸入請在該視窗進行。—",
     "run.aborted": "— 連線中斷：{msg} —",
     "toast.nameReq": "名稱與路徑必填",
     "toast.labelReq": "顯示名稱必填",
@@ -674,6 +691,8 @@ const I18N = {
     "err.scriptNotFound": "腳本不存在：{path}",
     "err.scriptXorCommand": "腳本檔案與直接指令必須擇一填寫",
     "err.noExternalTerminal": "此平台找不到可啟動的外部終端機",
+    "err.adminRequiresTerminal": "「以管理員身分執行」僅支援外部終端機模式",
+    "err.adminCancelled": "已取消管理員授權（UAC），未執行動作。",
     "err.invalidArguments": "附加指令參數格式錯誤：{detail}",
     "err.projectNotFound": "找不到專案",
     "err.projectPathMissing": "專案路徑不存在：{path}",
@@ -739,6 +758,11 @@ const I18N = {
     "act.executionLegend": "Run mode",
     "act.executionPanel": "Panel (default)",
     "act.executionTerminal": "External terminal (interactive input)",
+    "act.executionTerminalAdmin": "External terminal (run as administrator)",
+    "act.runAsAdmin": "Run as administrator (external terminal only)",
+    "act.runAsAdminHint": "Prompts Windows UAC elevation, or runs with sudo in Terminal on macOS.",
+    "act.runAsAdminNeedTerminal": "Switch to External terminal to enable running as administrator.",
+    "act.adminBadgeTitle": "Runs as administrator in an external terminal",
     "act.displayName": "Display name",
     "act.category": "Category (optional)",
     "act.svcLegend": "Button-state links (disable this button when all checked conditions hold)",
@@ -775,6 +799,7 @@ const I18N = {
     "svc.open": "Open ↗",
     "run.done": "— Finished, exit code {code} —",
     "run.terminalOpened": "— Opened in an external terminal; use that window for output and interactive input. —",
+    "run.terminalAdminOpened": "— Opened in an elevated external terminal; use that window for output and interactive input. —",
     "run.aborted": "— Connection lost: {msg} —",
     "toast.nameReq": "Name and path are required",
     "toast.labelReq": "Display name is required",
@@ -808,6 +833,8 @@ const I18N = {
     "err.scriptNotFound": "Script not found: {path}",
     "err.scriptXorCommand": "Fill in either a script file or a direct command, not both.",
     "err.noExternalTerminal": "No external terminal is available on this platform",
+    "err.adminRequiresTerminal": '"Run as administrator" is only supported in external terminal mode',
+    "err.adminCancelled": "Administrator authorization (UAC) was cancelled; action was not run.",
     "err.invalidArguments": "Invalid extra arguments: {detail}",
     "err.projectNotFound": "Project not found",
     "err.projectPathMissing": "Project path does not exist: {path}",
@@ -867,6 +894,7 @@ function setLang(lang) {
   renderProjectList();
   applySidebarUI();
   applyOutputUI();
+  syncAdminField();
   if (state.projectId) { renderActions(); refreshStatus(); }
   else { $("empty").textContent = t("empty.noProject"); }
 }
@@ -1244,13 +1272,20 @@ function renderActions() {
       const card = document.createElement("div");
       card.className = "action";
       const cmdText = formatActionCommand(a);
+      const adminTitle = t("act.adminBadgeTitle");
       const confirmTitle = t("act.confirmBadgeTitle");
-      const btnTitle = a.confirm_before_run ? `${cmdText}\n${confirmTitle}` : cmdText;
+      const titleParts = [cmdText];
+      if (a.run_as_admin) titleParts.push(adminTitle);
+      if (a.confirm_before_run) titleParts.push(confirmTitle);
+      const btnTitle = titleParts.join("\n");
+      const adminBadge = a.run_as_admin
+        ? `<span class="admin-badge" title="${esc(adminTitle)}" aria-label="${esc(adminTitle)}"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M8 1.5L2.5 3.8v3.9c0 3.4 2.3 6.3 5.5 7.3 3.2-1 5.5-3.9 5.5-7.3V3.8L8 1.5zm0 1.4l4.1 1.7v3.1c0 2.7-1.7 5-4.1 5.9-2.4-.9-4.1-3.2-4.1-5.9V4.6L8 2.9zm0 1.7L5.3 7.4h1.9v3.7h1.6V7.4h1.9L8 4.6z"/></svg></span>`
+        : "";
       const confirmBadge = a.confirm_before_run
         ? `<span class="confirm-badge" title="${esc(confirmTitle)}" aria-label="${esc(confirmTitle)}"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M8 1.5L2.5 3.8v3.9c0 3.4 2.3 6.3 5.5 7.3 3.2-1 5.5-3.9 5.5-7.3V3.8L8 1.5zm0 1.4l4.1 1.7v3.1c0 2.7-1.7 5-4.1 5.9-2.4-.9-4.1-3.2-4.1-5.9V4.6L8 2.9zm-.7 2.4v3.4h1.4V5.3H7.3zm0 4.4v1.4h1.4V9.7H7.3z"/></svg></span>`
         : "";
       card.innerHTML = `
-        <button class="run" data-id="${a.id}" title="${esc(btnTitle)}"><span class="run-label">${esc(a.label)}</span>${confirmBadge}</button>
+        <button class="run" data-id="${a.id}" title="${esc(btnTitle)}"><span class="run-label">${esc(a.label)}</span>${adminBadge}${confirmBadge}</button>
         <span class="mgmt">
           <button class="edit" data-id="${a.id}">${t("common.edit")}</button>
         </span>`;
@@ -1363,7 +1398,7 @@ function handleRunEvent(block) {
   } else if (event === "done") {
     appendOutput(t("run.done", { code: d.exit_code }), d.exit_code === 0 ? "meta" : "err");
   } else if (event === "terminal") {
-    appendOutput(t("run.terminalOpened"), "meta");
+    appendOutput(t(d.run_as_admin ? "run.terminalAdminOpened" : "run.terminalOpened"), "meta");
   } else if (event === "error") {
     // 後端回 error key（{key, params}）；由前端依語系組訊息。舊格式（純字串）仍相容。
     setOutputCollapsed(false, { persist: false });
@@ -1393,7 +1428,9 @@ function confirmRunAction(action) {
   $("confirm-run-action").textContent = action.label;
   $("confirm-run-command").textContent = formatActionCommand(action);
   $("confirm-run-mode").textContent = t(
-    action.execution_mode === "terminal" ? "act.executionTerminal" : "act.executionPanel"
+    action.execution_mode === "terminal"
+      ? (action.run_as_admin ? "act.executionTerminalAdmin" : "act.executionTerminal")
+      : "act.executionPanel"
   );
   const workdir = action.workdir && action.workdir.trim();
   $("confirm-run-workdir-row").hidden = !workdir;
@@ -1595,7 +1632,10 @@ async function openActionDialog(actionId) {
   setActionType(a?.command ? "command" : "script");
   $("a-command").value = a?.command || "";
   $("a-arguments").value = a?.arguments || "";
-  document.querySelector(`input[name="a-execution-mode"][value="${a?.execution_mode || "panel"}"]`).checked = true;
+  const mode = a?.execution_mode || "panel";
+  document.querySelector(`input[name="a-execution-mode"][value="${mode}"]`).checked = true;
+  $("a-run-as-admin").checked = Boolean(a?.run_as_admin && mode === "terminal");
+  syncAdminField();
   $("a-label").value = a ? a.label : "";
   $("a-category").value = a?.category || "";
   $("a-workdir").value = a?.workdir || "";
@@ -1613,6 +1653,17 @@ function syncConfirmFields() {
 }
 $("a-confirm-before-run").onchange = syncConfirmFields;
 
+function syncAdminField() {
+  const isTerminal = document.querySelector('input[name="a-execution-mode"]:checked').value === "terminal";
+  $("a-run-as-admin").disabled = !isTerminal;
+  $("a-run-as-admin-row").classList.toggle("disabled", !isTerminal);
+  if (!isTerminal) $("a-run-as-admin").checked = false;
+  $("a-run-as-admin-hint").textContent = t(isTerminal ? "act.runAsAdminHint" : "act.runAsAdminNeedTerminal");
+}
+document.querySelectorAll('input[name="a-execution-mode"]').forEach(r => {
+  r.onchange = syncAdminField;
+});
+
 function setActionType(t) {
   document.querySelector(`input[name="a-type"][value="${t}"]`).checked = true;
   $("a-script-row").hidden = t !== "script";
@@ -1625,11 +1676,13 @@ document.querySelectorAll('input[name="a-type"]').forEach(r => {
 
 async function saveAction() {
   const type = document.querySelector('input[name="a-type"]:checked').value;
+  const executionMode = document.querySelector('input[name="a-execution-mode"]:checked').value;
   const body = {
     script_file: type === "script" ? ($("a-script").value || null) : null,
     command: type === "command" ? ($("a-command").value.trim() || null) : null,
     arguments: type === "script" ? ($("a-arguments").value.trim() || null) : null,
-    execution_mode: document.querySelector('input[name="a-execution-mode"]:checked').value,
+    execution_mode: executionMode,
+    run_as_admin: executionMode === "terminal" && $("a-run-as-admin").checked,
     confirm_before_run: $("a-confirm-before-run").checked,
     confirm_message: $("a-confirm-message").value.trim() || null,
     label: $("a-label").value.trim(),

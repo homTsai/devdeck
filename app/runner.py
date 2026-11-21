@@ -1,6 +1,7 @@
 """腳本執行：依副檔名分派直譯器，非同步串流輸出。"""
 
 import asyncio
+import base64
 import json
 import os
 import shlex
@@ -92,17 +93,104 @@ def _powershell_literal(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
 
 
-def launch_external_terminal(cmd: list[str], cwd: str, env: dict | None = None):
+def _build_win_terminal_command(
+    cmd: list[str], cwd: str, env: dict | None = None, inject_venv: bool = False
+) -> str:
+    """組合 Windows 外部終端機執行指令；UAC 提權時可內嵌專案 venv 環境變數。"""
+    parts: list[str] = []
+    if inject_venv and env and env.get("VIRTUAL_ENV"):
+        venv_dir = env["VIRTUAL_ENV"]
+        venv_bin = str(Path(venv_dir) / "Scripts")
+        parts.append(f"$env:VIRTUAL_ENV = {_powershell_literal(venv_dir)}")
+        parts.append(f"$env:PATH = {_powershell_literal(venv_bin)} + ';' + $env:PATH")
+    parts.append(f"Set-Location -LiteralPath {_powershell_literal(cwd)}")
+    parts.append("& " + " ".join(_powershell_literal(arg) for arg in cmd))
+    return "; ".join(parts)
+
+
+def _encode_powershell_command(script: str) -> str:
+    """將 PowerShell 腳本轉為 -EncodedCommand 所需的 UTF-16LE Base64 字串。"""
+    return base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+
+
+def _shell_execute_runas(executable: str, parameters: str, cwd: str) -> None:
+    """透過 Win32 ShellExecuteExW(runas) 觸發原生 UAC 提權啟動外部終端機。"""
+    import ctypes
+    from ctypes import wintypes
+
+    class _SHELLEXECUTEINFOW(ctypes.Structure):
+        _fields_ = [
+            ("cbSize", wintypes.DWORD),
+            ("fMask", wintypes.ULONG),
+            ("hwnd", wintypes.HWND),
+            ("lpVerb", wintypes.LPCWSTR),
+            ("lpFile", wintypes.LPCWSTR),
+            ("lpParameters", wintypes.LPCWSTR),
+            ("lpDirectory", wintypes.LPCWSTR),
+            ("nShow", ctypes.c_int),
+            ("hInstApp", wintypes.HINSTANCE),
+            ("lpIDList", wintypes.LPVOID),
+            ("lpClass", wintypes.LPCWSTR),
+            ("hkeyClass", wintypes.HKEY),
+            ("dwHotKey", wintypes.DWORD),
+            ("hIconOrMonitor", wintypes.HANDLE),
+            ("hProcess", wintypes.HANDLE),
+        ]
+
+    SEE_MASK_FLAG_NO_UI = 0x00000400
+    SW_SHOWNORMAL = 1
+    ERROR_CANCELLED = 1223
+    COINIT_APARTMENTTHREADED = 0x2
+    COINIT_DISABLE_OLE1DDE = 0x4
+    S_OK = 0
+    S_FALSE = 1
+
+    ole32 = ctypes.WinDLL("ole32")
+    ole32.CoInitializeEx.argtypes = [wintypes.LPVOID, wintypes.DWORD]
+    ole32.CoInitializeEx.restype = ctypes.c_long
+    ole32.CoUninitialize.argtypes = []
+    ole32.CoUninitialize.restype = None
+
+    shell32 = ctypes.WinDLL("shell32", use_last_error=True)
+    shell32.ShellExecuteExW.argtypes = [ctypes.POINTER(_SHELLEXECUTEINFOW)]
+    shell32.ShellExecuteExW.restype = wintypes.BOOL
+
+    hr = ole32.CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE)
+    need_uninit = hr in (S_OK, S_FALSE)
+    try:
+        sei = _SHELLEXECUTEINFOW()
+        sei.cbSize = ctypes.sizeof(_SHELLEXECUTEINFOW)
+        sei.fMask = SEE_MASK_FLAG_NO_UI
+        sei.lpVerb = "runas"
+        sei.lpFile = executable
+        sei.lpParameters = parameters
+        sei.lpDirectory = cwd
+        sei.nShow = SW_SHOWNORMAL
+        if not shell32.ShellExecuteExW(ctypes.byref(sei)):
+            err_code = ctypes.get_last_error()
+            if err_code == ERROR_CANCELLED:
+                raise RunError("err.adminCancelled")
+            raise RunError("err.spawnFailed", detail=str(ctypes.WinError(err_code)))
+    finally:
+        if need_uninit:
+            ole32.CoUninitialize()
+
+
+def launch_external_terminal(
+    cmd: list[str], cwd: str, env: dict | None = None, run_as_admin: bool = False
+):
     """在可互動的外部終端機執行命令，不接管其 stdin/stdout。"""
     try:
         if sys.platform == "win32":
             shell = shutil.which("pwsh") or shutil.which("powershell")
             if not shell:
                 raise RunError("err.noPwsh")
-            command = (
-                f"Set-Location -LiteralPath {_powershell_literal(cwd)}; & "
-                + " ".join(_powershell_literal(arg) for arg in cmd)
-            )
+            if run_as_admin:
+                ps_script = _build_win_terminal_command(cmd, cwd, env, inject_venv=True)
+                encoded = _encode_powershell_command(ps_script)
+                _shell_execute_runas(shell, f"-NoExit -EncodedCommand {encoded}", cwd)
+                return
+            command = _build_win_terminal_command(cmd, cwd)
             subprocess.Popen(
                 [shell, "-NoExit", "-Command", command],
                 cwd=cwd,
@@ -111,7 +199,15 @@ def launch_external_terminal(cmd: list[str], cwd: str, env: dict | None = None):
             )
             return
         if sys.platform == "darwin":
-            command = f"cd {shlex.quote(cwd)} && {shlex.join(cmd)}"
+            if run_as_admin:
+                env_pairs = (
+                    [f"{key}={env[key]}" for key in ("PATH", "VIRTUAL_ENV") if env.get(key)]
+                    if env else []
+                )
+                exec_cmd = ["sudo", "--", "env", *env_pairs, *cmd] if env_pairs else ["sudo", "--", *cmd]
+            else:
+                exec_cmd = cmd
+            command = f"cd {shlex.quote(cwd)} && {shlex.join(exec_cmd)}"
             if env:
                 exports = [
                     f"export {key}={shlex.quote(env[key])}"

@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS actions (
     command     TEXT,               -- 與 script_file 二選一：直接執行的指令
     arguments   TEXT,               -- 腳本檔案的固定附加參數（以 shell 風格引號分隔）
     execution_mode TEXT NOT NULL DEFAULT 'panel' CHECK (execution_mode IN ('panel', 'terminal')),
+    run_as_admin   INTEGER NOT NULL DEFAULT 0, -- 是否以管理員身分執行（0/1，僅限外部終端機）
     confirm_before_run INTEGER NOT NULL DEFAULT 0, -- 執行前是否顯示確認對話框（0/1）
     confirm_message    TEXT,        -- 自訂確認訊息（NULL 時前端依語系顯示預設訊息）
     label       TEXT NOT NULL,
@@ -146,6 +147,11 @@ def _migrate():
                 conn.commit()
             if "confirm_message" not in cols:
                 conn.execute("ALTER TABLE actions ADD COLUMN confirm_message TEXT")
+                conn.commit()
+            # v8 → v9：動作可設定以管理員身分執行（僅限外部終端機模式）
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(actions)")}
+            if "run_as_admin" not in cols:
+                conn.execute("ALTER TABLE actions ADD COLUMN run_as_admin INTEGER NOT NULL DEFAULT 0")
                 conn.commit()
         # v6 → v7：projects 新增 sort_order 欄位（依既有 name 順序填入 10, 20, ...，避免升級後順序跳動）
         if proj_cols and "sort_order" not in proj_cols:

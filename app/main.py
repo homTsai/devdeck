@@ -116,6 +116,7 @@ class ActionIn(BaseModel):
     command: str | None = None
     arguments: str | None = None
     execution_mode: Literal["panel", "terminal"] = "panel"
+    run_as_admin: bool = False
     confirm_before_run: bool = False
     confirm_message: str | None = None
     label: str
@@ -127,6 +128,10 @@ class ActionIn(BaseModel):
     def validate_source(self):
         if bool(self.script_file) == bool(self.command):
             raise HTTPException(400, detail={"key": "err.scriptXorCommand"})
+
+    def validate_execution(self):
+        if self.run_as_admin and self.execution_mode != "terminal":
+            raise HTTPException(400, detail={"key": "err.adminRequiresTerminal"})
 
 
 class PickDirIn(BaseModel):
@@ -338,6 +343,7 @@ def list_actions(project_id: int):
             links.setdefault(r["action_id"], []).append(
                 {"service_id": r["service_id"], "disable_when": r["disable_when"]})
     for a in actions:
+        a["run_as_admin"] = bool(a.get("run_as_admin"))
         a["confirm_before_run"] = bool(a.get("confirm_before_run"))
         a["services"] = links.get(a["id"], [])
     return actions
@@ -347,12 +353,13 @@ def list_actions(project_id: int):
 def create_action(project_id: int, body: ActionIn):
     get_project(project_id)
     body.validate_source()
+    body.validate_execution()
     confirm_msg = _norm_confirm_message(body.confirm_message)
     with db.get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO actions (project_id, script_file, command, arguments, execution_mode, confirm_before_run, confirm_message, label, workdir, category, sort_order)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-            (project_id, body.script_file, body.command, body.arguments, body.execution_mode,
+            "INSERT INTO actions (project_id, script_file, command, arguments, execution_mode, run_as_admin, confirm_before_run, confirm_message, label, workdir, category, sort_order)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (project_id, body.script_file, body.command, body.arguments, body.execution_mode, int(body.run_as_admin),
              int(body.confirm_before_run), confirm_msg, body.label, body.workdir, body.category, body.sort_order),
         )
         _replace_links(conn, cur.lastrowid, body.services)
@@ -362,12 +369,13 @@ def create_action(project_id: int, body: ActionIn):
 @app.put("/api/actions/{action_id}")
 def update_action(action_id: int, body: ActionIn):
     body.validate_source()
+    body.validate_execution()
     confirm_msg = _norm_confirm_message(body.confirm_message)
     with db.get_conn() as conn:
         cur = conn.execute(
-            "UPDATE actions SET script_file=?, command=?, arguments=?, execution_mode=?, confirm_before_run=?, confirm_message=?, label=?, workdir=?, category=?, sort_order=?"
+            "UPDATE actions SET script_file=?, command=?, arguments=?, execution_mode=?, run_as_admin=?, confirm_before_run=?, confirm_message=?, label=?, workdir=?, category=?, sort_order=?"
             " WHERE id=?",
-            (body.script_file, body.command, body.arguments, body.execution_mode,
+            (body.script_file, body.command, body.arguments, body.execution_mode, int(body.run_as_admin),
              int(body.confirm_before_run), confirm_msg, body.label, body.workdir, body.category, body.sort_order, action_id),
         )
         if cur.rowcount == 0:
@@ -505,11 +513,17 @@ async def run_action(action_id: int, _body: dict = Body(default={})):
             yield ev("error", {"key": e.key, "params": e.params})
             return
         cwd = action["workdir"] or project["path"]
+        run_as_admin = bool(action.get("run_as_admin"))
+        if run_as_admin and action["execution_mode"] != "terminal":
+            yield ev("error", {"key": "err.adminRequiresTerminal", "params": {}})
+            return
         yield ev("start", {"cmd": cmd, "cwd": cwd})
         if action["execution_mode"] == "terminal":
             try:
-                runner.launch_external_terminal(cmd, cwd, env)
-                yield ev("terminal", {})
+                await asyncio.to_thread(
+                    runner.launch_external_terminal, cmd, cwd, env, run_as_admin=run_as_admin
+                )
+                yield ev("terminal", {"run_as_admin": run_as_admin})
             except runner.RunError as e:
                 yield ev("error", {"key": e.key, "params": e.params})
             return
