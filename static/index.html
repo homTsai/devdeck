@@ -98,6 +98,13 @@
     box-shadow: inset 3px 0 0 var(--accent);
     color: #fff; font-weight: 600;
   }
+  .project-item.is-context-target {
+    border-color: var(--accent);
+    background: rgba(79,140,255,.12);
+  }
+  .project-item.active.is-context-target {
+    background: rgba(79,140,255,.24);
+  }
   .project-name {
     flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
@@ -459,6 +466,20 @@
     padding: 6px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     user-select: text;
   }
+  .popup-menu-header-row {
+    display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px;
+  }
+  .popup-menu-header-row .popup-menu-header {
+    flex: 1; min-width: 0; padding: 2px 0;
+  }
+  .popup-menu-header-action {
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    width: 24px; height: 24px; padding: 0; border: 1px solid transparent; border-radius: 5px;
+    background: transparent; color: var(--muted); cursor: pointer;
+  }
+  .popup-menu-header-action:hover, .popup-menu-header-action:focus-visible {
+    color: #fff; background: rgba(79,140,255,.22); border-color: rgba(79,140,255,.45); outline: none;
+  }
   .popup-menu-sep { height: 1px; background: var(--border); margin: 4px 2px; }
   .popup-menu-item {
     display: flex; align-items: center; gap: 9px; width: 100%;
@@ -475,6 +496,13 @@
   .popup-menu-item:hover .popup-menu-item-icon,
   .popup-menu-item:focus-visible .popup-menu-item-icon { color: var(--text); }
   .popup-menu-item.is-admin .popup-menu-item-icon { color: var(--accent); }
+  .popup-menu-item:disabled {
+    color: var(--muted); opacity: .48; cursor: not-allowed;
+  }
+  .popup-menu-item:disabled:hover, .popup-menu-item:disabled:focus-visible {
+    background: transparent; color: var(--muted);
+  }
+  .popup-menu-item:disabled .popup-menu-item-icon { color: var(--muted); }
 
   #toast-container {
     position: fixed; right: 16px; bottom: 16px; z-index: 200;
@@ -834,6 +862,7 @@ const I18N = {
     "proj.del": "刪除專案",
     "proj.dragHint": "拖曳調整專案順序",
     "proj.dirMenuTitle": "專案目錄操作",
+    "proj.openProject": "開啟專案",
     "proj.openTerminal": "開啟外部終端機",
     "proj.openTerminalAdmin": "開啟外部終端機（管理員）",
     "proj.openExplorer": "開啟檔案總管",
@@ -1025,6 +1054,7 @@ const I18N = {
     "proj.del": "Delete project",
     "proj.dragHint": "Drag to reorder project",
     "proj.dirMenuTitle": "Project directory actions",
+    "proj.openProject": "Open project",
     "proj.openTerminal": "Open external terminal",
     "proj.openTerminalAdmin": "Open external terminal (Admin)",
     "proj.openExplorer": "Open in File Explorer",
@@ -1243,7 +1273,7 @@ const state = {
   editingActionId: null, editingActionScope: "project",
   editingCategory: null, editingCategoryScope: "project",
   lastScriptDirSelection: "__abs__",
-  editingProject: false, statusTimer: null, runAbort: null,
+  editingProjectId: null, projectDialogSeq: 0, statusTimer: null, runAbort: null,
   projectSeq: 0, statusSeq: 0, projectAbort: null, statusAbort: null, statusPollingActive: false,
   outputLabel: null, outputProjectName: null,  // 目前輸出面板顯示的動作與來源專案名稱
   sidebarCollapsedWide: localStorage.getItem("devdeck.sidebarCollapsedWide") === "1",
@@ -1336,6 +1366,7 @@ function closePopupMenu({ restoreFocus = false } = {}) {
     window.removeEventListener("resize", prev.onCloseTrigger);
     window.removeEventListener("scroll", prev.onScroll, true);
     if (prev.anchorEl) prev.anchorEl.setAttribute("aria-expanded", "false");
+    if (prev.targetEl) prev.targetEl.classList.remove("is-context-target");
     if (prev.onClose) prev.onClose();
     if (restoreFocus && prev.anchorEl && prev.anchorEl.isConnected) {
       prev.anchorEl.focus();
@@ -1345,7 +1376,7 @@ function closePopupMenu({ restoreFocus = false } = {}) {
   menu.innerHTML = "";
 }
 
-function openPopupMenu({ anchorEl = null, point = null, headerText = "", items = [], onClose = null }) {
+function openPopupMenu({ anchorEl = null, targetEl = null, point = null, headerText = "", headerAction = null, items = [], onClose = null }) {
   const menu = $("popup-menu");
   if (!menu) return;
   if (anchorEl && _popupMenuState && _popupMenuState.anchorEl === anchorEl && isPopupMenuOpen()) {
@@ -1354,13 +1385,36 @@ function openPopupMenu({ anchorEl = null, point = null, headerText = "", items =
   }
   closePopupMenu();
 
+  if (targetEl) targetEl.classList.add("is-context-target");
+  menu.oncontextmenu = e => { if (!e.shiftKey) e.preventDefault(); };
+
   menu.innerHTML = "";
   if (headerText) {
     const head = document.createElement("div");
     head.className = "popup-menu-header";
     head.textContent = headerText;
     head.title = headerText;
-    menu.appendChild(head);
+    if (headerAction) {
+      const row = document.createElement("div");
+      row.className = "popup-menu-header-row";
+      row.appendChild(head);
+      const actBtn = document.createElement("button");
+      actBtn.type = "button";
+      actBtn.className = "popup-menu-header-action";
+      if (headerAction.title) actBtn.title = headerAction.title;
+      if (headerAction.ariaLabel || headerAction.title) {
+        actBtn.setAttribute("aria-label", headerAction.ariaLabel || headerAction.title);
+      }
+      actBtn.innerHTML = headerAction.iconSvg || "";
+      actBtn.onclick = () => {
+        closePopupMenu();
+        if (headerAction.onClick) headerAction.onClick();
+      };
+      row.appendChild(actBtn);
+      menu.appendChild(row);
+    } else {
+      menu.appendChild(head);
+    }
     const sep = document.createElement("div");
     sep.className = "popup-menu-sep";
     sep.setAttribute("role", "separator");
@@ -1379,8 +1433,13 @@ function openPopupMenu({ anchorEl = null, point = null, headerText = "", items =
     btn.type = "button";
     btn.className = "popup-menu-item" + (item.className ? ` ${item.className}` : "");
     btn.setAttribute("role", "menuitem");
+    if (item.disabled) {
+      btn.disabled = true;
+      btn.setAttribute("aria-disabled", "true");
+    }
     btn.innerHTML = `<span class="popup-menu-item-icon" aria-hidden="true">${item.iconSvg || ""}</span><span>${esc(item.label)}</span>`;
     btn.onclick = () => {
+      if (item.disabled) return;
       closePopupMenu();
       if (item.onClick) item.onClick();
     };
@@ -1406,6 +1465,12 @@ function openPopupMenu({ anchorEl = null, point = null, headerText = "", items =
   } else if (point) {
     left = point.x;
     top = point.y;
+    if (left + menuW > window.innerWidth - margin && point.x - menuW >= margin) {
+      left = point.x - menuW;
+    }
+    if (top + menuH > window.innerHeight - margin && point.y - menuH >= margin) {
+      top = point.y - menuH;
+    }
   }
 
   left = Math.min(Math.max(margin, left), Math.max(margin, window.innerWidth - menuW - margin));
@@ -1427,7 +1492,7 @@ function openPopupMenu({ anchorEl = null, point = null, headerText = "", items =
       return;
     }
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      const btns = [...menu.querySelectorAll(".popup-menu-item")];
+      const btns = [...menu.querySelectorAll(".popup-menu-item:not(:disabled)")];
       if (!btns.length) return;
       e.preventDefault();
       const idx = btns.indexOf(document.activeElement);
@@ -1443,7 +1508,7 @@ function openPopupMenu({ anchorEl = null, point = null, headerText = "", items =
   };
 
   _popupMenuState = {
-    anchorEl, onClose, onDocPointerDown, onDocKeyDown, onCloseTrigger, onScroll,
+    anchorEl, targetEl, onClose, onDocPointerDown, onDocKeyDown, onCloseTrigger, onScroll,
   };
   document.addEventListener("pointerdown", onDocPointerDown, true);
   document.addEventListener("keydown", onDocKeyDown, true);
@@ -1507,13 +1572,19 @@ async function copyProjectPath(project) {
   else showToast(t("toast.copyFailed"), "error", 3000);
 }
 
+const COPY_ICON_SVG = `<svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M10.5 1.5h-6A1.5 1.5 0 0 0 3 3v8.5h1.2V3a.3.3 0 0 1 .3-.3h6V1.5zm2 2.5h-6A1.5 1.5 0 0 0 5 5.5v8A1.5 1.5 0 0 0 6.5 15h6A1.5 1.5 0 0 0 14 13.5v-8A1.5 1.5 0 0 0 12.5 4zm.3 9.5a.3.3 0 0 1-.3.3h-6a.3.3 0 0 1-.3-.3v-8a.3.3 0 0 1 .3-.3h6a.3.3 0 0 1 .3.3v8z"/></svg>`;
+
+function buildProjectPathHeaderAction(project) {
+  return {
+    iconSvg: COPY_ICON_SVG,
+    title: t("proj.copyPath"),
+    ariaLabel: t("proj.copyPath"),
+    onClick: () => copyProjectPath(project),
+  };
+}
+
 function buildProjectDirMenuItems(project) {
   return [
-    {
-      iconSvg: `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M10.5 1.5h-6A1.5 1.5 0 0 0 3 3v8.5h1.2V3a.3.3 0 0 1 .3-.3h6V1.5zm2 2.5h-6A1.5 1.5 0 0 0 5 5.5v8A1.5 1.5 0 0 0 6.5 15h6A1.5 1.5 0 0 0 14 13.5v-8A1.5 1.5 0 0 0 12.5 4zm.3 9.5a.3.3 0 0 1-.3.3h-6a.3.3 0 0 1-.3-.3v-8a.3.3 0 0 1 .3-.3h6a.3.3 0 0 1 .3.3v8z"/></svg>`,
-      label: t("proj.copyPath"),
-      onClick: () => copyProjectPath(project),
-    },
     {
       iconSvg: `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M1.75 2.5A1.25 1.25 0 0 0 .5 3.75v8.5c0 .69.56 1.25 1.25 1.25h12.5c.69 0 1.25-.56 1.25-1.25v-6.5c0-.69-.56-1.25-1.25-1.25H7.81l-1.2-1.5A1.25 1.25 0 0 0 5.63 2.5H1.75zm0 1.25h3.88l1.2 1.5c.24.3.6.47.98.47h6.44v6.53H1.75V3.75z"/></svg>`,
       label: getFolderActionLabel(),
@@ -1530,6 +1601,32 @@ function buildProjectDirMenuItems(project) {
       label: t("proj.openTerminalAdmin"),
       onClick: () => openProjectTerminal(project, true),
     },
+  ];
+}
+
+async function activateProjectFromSidebar(projectId) {
+  if ((isNarrow() || state.sidebarCollapsedWide) && !state.projectSortMode) {
+    state.sidebarDrawerOpen = false;
+    applySidebarUI();
+  }
+  if (state.projectId !== projectId) await selectProject(projectId);
+}
+
+function buildProjectContextMenuItems(project) {
+  return [
+    {
+      iconSvg: `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M3 2.5A1.5 1.5 0 0 0 1.5 4v8A1.5 1.5 0 0 0 3 13.5h10a1.5 1.5 0 0 0 1.5-1.5V4A1.5 1.5 0 0 0 13 2.5H3zm0 1.2h10a.3.3 0 0 1 .3.3v8a.3.3 0 0 1-.3.3H6.2V3.7H3zm2 0v8.6H3a.3.3 0 0 1-.3-.3V4a.3.3 0 0 1 .3-.3h2z"/></svg>`,
+      label: t("proj.openProject"),
+      disabled: project.id === state.projectId,
+      onClick: () => activateProjectFromSidebar(project.id),
+    },
+    {
+      iconSvg: `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M6.5 1.5h3l.4 1.9a5.2 5.2 0 0 1 1.25.72l1.85-.62 1.5 2.6-1.45 1.3c.06.4.06.8 0 1.2l1.45 1.3-1.5 2.6-1.85-.62a5.2 5.2 0 0 1-1.25.72l-.4 1.9h-3l-.4-1.9a5.2 5.2 0 0 1-1.25-.72L3 12.5l-1.5-2.6 1.45-1.3a5.1 5.1 0 0 1 0-1.2L1.5 6.1 3 3.5l1.85.62c.39-.29.81-.53 1.25-.72l.4-1.9zM8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg>`,
+      label: t("header.editProject"),
+      onClick: () => openProjectDialog(true, project.id),
+    },
+    { separator: true },
+    ...buildProjectDirMenuItems(project),
   ];
 }
 
@@ -1799,12 +1896,17 @@ function renderProjectList() {
       <span class="project-handle" title="${esc(t("proj.dragHint"))}">⠿</span>
       <span class="project-name" title="${esc(p.name)}">${esc(p.name)}</span>`;
 
-    item.onclick = async () => {
-      if ((isNarrow() || state.sidebarCollapsedWide) && !state.projectSortMode) {
-        state.sidebarDrawerOpen = false;
-        applySidebarUI();
-      }
-      if (state.projectId !== p.id) await selectProject(p.id);
+    item.onclick = () => activateProjectFromSidebar(p.id);
+    item.oncontextmenu = e => {
+      if (e.shiftKey) return;
+      e.preventDefault();
+      openPopupMenu({
+        targetEl: item,
+        point: { x: e.clientX, y: e.clientY },
+        headerText: p.path,
+        headerAction: buildProjectPathHeaderAction(p),
+        items: buildProjectContextMenuItems(p),
+      });
     };
 
     item.ondragstart = e => {
@@ -2390,21 +2492,45 @@ function svcRow(s = {}) {
   return tr;
 }
 
-function openProjectDialog(editing) {
-  state.editingProject = editing;
-  const p = editing ? currentProject() : null;
-  $("project-dialog-title").textContent = t(editing ? "proj.editTitle" : "proj.addTitle");
-  $("p-name").value = p ? p.name : "";
-  $("p-path").value = p ? p.path : "";
-  $("p-scripts").value = p ? p.scripts_dir : "scripts";
-  $("p-venv").value = p ? p.venv_path : ".venv";
-  $("btn-del-project").hidden = !editing;
-  $("svc-fieldset").hidden = !editing;
-  if (editing) {
-    const tbody = $("svc-rows");
-    tbody.innerHTML = "";
-    for (const s of state.services) tbody.appendChild(svcRow(s));
+async function openProjectDialog(editing, projectId = null) {
+  const seq = ++state.projectDialogSeq;
+  if (!editing) {
+    state.editingProjectId = null;
+    $("project-dialog-title").textContent = t("proj.addTitle");
+    $("p-name").value = "";
+    $("p-path").value = "";
+    $("p-scripts").value = "scripts";
+    $("p-venv").value = ".venv";
+    $("btn-del-project").hidden = true;
+    $("svc-fieldset").hidden = true;
+    $("svc-rows").innerHTML = "";
+    $("project-dialog").showModal();
+    return;
   }
+  const targetId = projectId ?? state.projectId;
+  const p = state.projects.find(x => x.id === targetId);
+  if (!p) return;
+  let services = state.services;
+  if (p.id !== state.projectId) {
+    try {
+      services = await api("GET", `/api/projects/${p.id}/services`);
+    } catch (err) {
+      toast(err.message);
+      return;
+    }
+    if (seq !== state.projectDialogSeq) return;
+  }
+  state.editingProjectId = p.id;
+  $("project-dialog-title").textContent = t("proj.editTitle");
+  $("p-name").value = p.name;
+  $("p-path").value = p.path;
+  $("p-scripts").value = p.scripts_dir;
+  $("p-venv").value = p.venv_path;
+  $("btn-del-project").hidden = false;
+  $("svc-fieldset").hidden = false;
+  const tbody = $("svc-rows");
+  tbody.innerHTML = "";
+  for (const s of services) tbody.appendChild(svcRow(s));
   $("project-dialog").showModal();
 }
 
@@ -2417,9 +2543,9 @@ async function saveProject() {
   };
   if (!body.name || !body.path) return toast(t("toast.nameReq"));
   try {
-    let id = state.projectId;
-    if (state.editingProject) {
-      await api("PUT", `/api/projects/${id}`, body);
+    const editingId = state.editingProjectId;
+    if (editingId != null) {
+      await api("PUT", `/api/projects/${editingId}`, body);
       for (const tr of $("svc-rows").children) {
         const svc = {
           name: tr.querySelector(".s-name").value.trim(),
@@ -2430,16 +2556,23 @@ async function saveProject() {
           ? `http://localhost:${svc.port}` : null;
         if (!svc.name || !svc.port) continue;
         if (tr.dataset.id) await api("PUT", `/api/services/${tr.dataset.id}`, svc);
-        else await api("POST", `/api/projects/${id}/services`, svc);
+        else await api("POST", `/api/projects/${editingId}/services`, svc);
+      }
+      state.editingProjectId = null;
+      $("project-dialog").close();
+      if (editingId === state.projectId) {
+        await loadProjects(state.projectId);
+      } else {
+        state.projects = await api("GET", "/api/projects");
+        renderProjectList();
       }
     } else {
-      id = (await api("POST", "/api/projects", body)).id;
-    }
-    $("project-dialog").close();
-    await loadProjects(id);
-    if (!state.editingProject) {
+      const createdId = (await api("POST", "/api/projects", body)).id;
+      state.editingProjectId = null;
+      $("project-dialog").close();
+      await loadProjects(createdId);
       // 新專案：直接再開編輯模式讓使用者補服務設定
-      openProjectDialog(true);
+      await openProjectDialog(true, createdId);
     }
   } catch (e) { toast(e.message); }
 }
@@ -2950,17 +3083,29 @@ $("btn-project-dir-menu").onclick = e => {
   openPopupMenu({
     anchorEl: $("btn-project-dir-menu"),
     headerText: p.path,
+    headerAction: buildProjectPathHeaderAction(p),
     items: buildProjectDirMenuItems(p),
   });
 };
 $("btn-save-project").onclick = saveProject;
 $("btn-del-project").onclick = async () => {
-  const p = currentProject();
+  const targetId = state.editingProjectId ?? state.projectId;
+  const p = state.projects.find(x => x.id === targetId);
+  if (!p) return;
   if (!confirm(t("confirm.delProject", { name: p.name }))) return;
   await api("DELETE", `/api/projects/${p.id}`);
+  state.editingProjectId = null;
   $("project-dialog").close();
-  await loadProjects();
+  if (p.id === state.projectId) {
+    await loadProjects();
+  } else {
+    state.projects = await api("GET", "/api/projects");
+    renderProjectList();
+  }
 };
+$("project-dialog").addEventListener("close", () => {
+  state.editingProjectId = null;
+});
 $("btn-add-svc").onclick = e => { e.preventDefault(); $("svc-rows").appendChild(svcRow()); };
 $("btn-add-action").onclick = () => openActionDialog(null, state.activeTab);
 $("btn-add-project-action").onclick = () => openActionDialog(null, "project");
