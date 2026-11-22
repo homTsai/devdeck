@@ -2223,6 +2223,10 @@ function getAbsMaxOutputWidth(wsWidth) {
   return Math.max(OUTPUT_MIN_WIDTH, wsWidth - (CENTER_MIN_TABS + SPLITTER_WIDTH));
 }
 
+function getSplitMaxOutputWidth(wsWidth) {
+  return Math.max(OUTPUT_MIN_WIDTH, wsWidth - (CENTER_MIN_SPLIT + SPLITTER_WIDTH));
+}
+
 function computePresetOutputWidth(preset, wsWidth) {
   const maxW = getAbsMaxOutputWidth(wsWidth);
   if (preset === "min") return OUTPUT_MIN_WIDTH;
@@ -2244,16 +2248,30 @@ function getTargetOutputWidth(wsWidth) {
   return null;
 }
 
+function isOutputTooWideForSplit(ws) {
+  if (!ws || isOutputCollapsed()) return false;
+  const targetW = getTargetOutputWidth(ws.clientWidth);
+  if (targetW == null) return false;
+  return ws.clientWidth - (targetW + SPLITTER_WIDTH) < CENTER_MIN_SPLIT;
+}
+
+function yieldSplitIfOutputTooWide(targetOutputW) {
+  const ws = $("main-workspace");
+  if (!ws || isOutputCollapsed() || !state.splitMode) return;
+  if (ws.clientWidth - (targetOutputW + SPLITTER_WIDTH) < CENTER_MIN_SPLIT) {
+    state.splitMode = false;
+    localStorage.setItem("devdeck.actionSplit", "0");
+  }
+}
+
 function canUseSplitLayout() {
   if (isNarrow()) return false;
   const ws = $("main-workspace");
   if (!ws) return false;
-  let requiredOutputSpace = COLLAPSED_OUTPUT_WIDTH;
-  if (!isOutputCollapsed()) {
-    const targetW = getTargetOutputWidth(ws.clientWidth);
-    requiredOutputSpace = (targetW != null ? targetW : OUTPUT_MIN_WIDTH) + SPLITTER_WIDTH;
-  }
-  return ws.clientWidth >= CENTER_MIN_SPLIT + requiredOutputSpace;
+  const minOutputSpace = isOutputCollapsed()
+    ? COLLAPSED_OUTPUT_WIDTH
+    : (OUTPUT_MIN_WIDTH + SPLITTER_WIDTH);
+  return ws.clientWidth >= CENTER_MIN_SPLIT + minOutputSpace;
 }
 
 function getMaxOutputWidth(wsWidth) {
@@ -2327,6 +2345,7 @@ function setOutputWidthPreset(preset) {
     if (w != null) {
       state.outputWidth = w;
       localStorage.setItem("devdeck.outputWidth", String(w));
+      yieldSplitIfOutputTooWide(w);
     }
   }
   applyActionLayout();
@@ -2426,7 +2445,7 @@ function applyActionLayout() {
   }
 
   const canSplit = canUseSplitLayout();
-  const effectiveSplit = state.splitMode && canSplit;
+  const effectiveSplit = state.splitMode && canSplit && !isOutputTooWideForSplit(ws);
   state.effectiveSplit = effectiveSplit;
 
   if (ws) ws.classList.toggle("split-active", effectiveSplit);
@@ -3632,6 +3651,7 @@ $("output-head").onclick = () => {
     state.outputWidthPreset = null;
     localStorage.removeItem("devdeck.outputWidthPreset");
     state.outputWidth = w;
+    yieldSplitIfOutputTooWide(w);
     ws.style.setProperty("--output-width", `${w}px`);
     applyActionLayout();
     syncOutputWidthPresetButtons();
@@ -3681,6 +3701,7 @@ $("output-head").onclick = () => {
     localStorage.removeItem("devdeck.outputWidthPreset");
     state.outputWidth = Math.round(Math.min(Math.max(OUTPUT_MIN_WIDTH, cur + delta), maxW));
     localStorage.setItem("devdeck.outputWidth", String(state.outputWidth));
+    yieldSplitIfOutputTooWide(state.outputWidth);
     applyActionLayout();
     applyOutputWidth();
   });
@@ -3724,9 +3745,28 @@ $("tab-global").onclick = () => {
 $("btn-toggle-split").onclick = () => {
   if ($("btn-toggle-split").disabled) return;
   closePopupMenu();
-  state.splitMode = !state.splitMode;
-  localStorage.setItem("devdeck.actionSplit", state.splitMode ? "1" : "0");
+  const nextSplit = !state.splitMode;
+  state.splitMode = nextSplit;
+  localStorage.setItem("devdeck.actionSplit", nextSplit ? "1" : "0");
+  if (nextSplit && !isOutputCollapsed()) {
+    const ws = $("main-workspace");
+    if (ws) {
+      const splitMaxW = getSplitMaxOutputWidth(ws.clientWidth);
+      const curPanel = $("output-panel");
+      const targetW = getTargetOutputWidth(ws.clientWidth);
+      const effectiveW = targetW != null
+        ? targetW
+        : (curPanel ? Math.round(curPanel.getBoundingClientRect().width) : Math.round(ws.clientWidth * 0.42));
+      if (effectiveW > splitMaxW) {
+        state.outputWidthPreset = null;
+        localStorage.removeItem("devdeck.outputWidthPreset");
+        state.outputWidth = splitMaxW;
+        localStorage.setItem("devdeck.outputWidth", String(splitMaxW));
+      }
+    }
+  }
   applyActionLayout();
+  applyOutputWidth();
 };
 
 $("btn-add-project").onclick = () => openProjectDialog(false);
