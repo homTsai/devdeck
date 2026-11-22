@@ -182,6 +182,8 @@ class ActionVisibilityIn(BaseModel):
 
 class RunActionIn(BaseModel):
     project_id: int | None = None
+    execution_mode: Literal["panel", "terminal"] | None = None
+    run_as_admin: bool | None = None
 
 
 class PickDirIn(BaseModel):
@@ -872,17 +874,29 @@ async def run_action(action_id: int, body: RunActionIn = Body(default_factory=Ru
         if not Path(cwd).is_dir():
             yield ev("error", {"key": "err.workdirMissing", "params": {"path": cwd}})
             return
-        run_as_admin = bool(action.get("run_as_admin"))
-        if run_as_admin and action["execution_mode"] != "terminal":
+        effective_mode = (
+            body.execution_mode if body.execution_mode is not None else action["execution_mode"]
+        )
+        if body.run_as_admin is not None:
+            effective_run_as_admin = bool(body.run_as_admin)
+        elif body.execution_mode == "panel":
+            effective_run_as_admin = False
+        else:
+            effective_run_as_admin = bool(action.get("run_as_admin"))
+        if effective_run_as_admin and effective_mode != "terminal":
             yield ev("error", {"key": "err.adminRequiresTerminal", "params": {}})
             return
         yield ev("start", {"cmd": cmd, "cwd": cwd})
-        if action["execution_mode"] == "terminal":
+        if effective_mode == "terminal":
             try:
                 await asyncio.to_thread(
-                    runner.launch_external_terminal, cmd, cwd, env, run_as_admin=run_as_admin
+                    runner.launch_external_terminal,
+                    cmd,
+                    cwd,
+                    env,
+                    run_as_admin=effective_run_as_admin,
                 )
-                yield ev("terminal", {"run_as_admin": run_as_admin})
+                yield ev("terminal", {"run_as_admin": effective_run_as_admin})
             except runner.RunError as e:
                 yield ev("error", {"key": e.key, "params": e.params})
             return

@@ -245,6 +245,15 @@
     background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
     overflow: hidden;
   }
+  .action.is-context-target {
+    border-color: var(--accent);
+    background: rgba(79,140,255,.12);
+    box-shadow: 0 0 0 1px rgba(79,140,255,.35);
+  }
+  .action.is-hidden-action.is-context-target {
+    opacity: .78;
+  }
+  .action.is-disabled { cursor: not-allowed; }
   .action > .run {
     display: inline-flex; align-items: center; gap: 6px;
     border: none; border-radius: 0; background: none; padding: 8px 14px;
@@ -258,7 +267,7 @@
   }
   .action > .run:hover { background: rgba(79,140,255,.12); }
   .action > .run.running { color: var(--accent); }
-  .action > .run:disabled { opacity: .35; cursor: not-allowed; }
+  .action > .run:disabled { opacity: .35; cursor: not-allowed; pointer-events: none; }
   .action > .run:disabled:hover { background: none; }
   .action .mgmt { display: none; }
   #center-pane.is-managing-actions .action .mgmt {
@@ -910,6 +919,14 @@ const I18N = {
     "act.noServices": "此專案尚未設定服務（在「專案設定」中加入）",
     "act.whenRunning": "運行中時停用",
     "act.whenStopped": "停止時停用",
+    "act.menuRun": "執行",
+    "act.menuRunTerminal": "單次用外部終端機開啟",
+    "act.menuRunTerminalAdmin": "單次用外部終端機（管理員）開啟",
+    "act.menuCopyCommand": "複製指令",
+    "act.menuCopyPath": "複製路徑",
+    "act.menuSettings": "按鈕設定",
+    "act.menuHide": "隱藏",
+    "act.menuShow": "顯示",
     "empty.noProject": "還沒有專案，按「＋ 新增專案」開始。",
     "empty.noProjectOption": "（尚無專案）",
     "empty.noAction": "此專案還沒有動作，按「＋ 新增動作」從腳本目錄挑選。",
@@ -943,6 +960,11 @@ const I18N = {
     "toast.commandReq": "指令內容必填",
     "toast.pathCopied": "已複製目錄路徑",
     "toast.copyFailed": "無法複製目錄路徑",
+    "toast.commandCopied": "已複製指令",
+    "toast.scriptPathCopied": "已複製腳本路徑",
+    "toast.copyCommandFailed": "無法複製指令",
+    "toast.copyScriptPathFailed": "無法複製腳本路徑",
+    "toast.globalHiddenHint": "已隱藏「{label}」，可開啟「動作管理」重新顯示",
     "confirm.delSvc": "刪除服務「{name}」？",
     "confirm.delProject": "刪除專案「{name}」及其所有動作設定？（不會動到專案檔案本身）",
     "confirm.delAction": "刪除動作「{label}」？",
@@ -1102,6 +1124,14 @@ const I18N = {
     "act.noServices": 'This project has no services yet (add them in "Project settings").',
     "act.whenRunning": "Disable when running",
     "act.whenStopped": "Disable when stopped",
+    "act.menuRun": "Run",
+    "act.menuRunTerminal": "Run once in external terminal",
+    "act.menuRunTerminalAdmin": "Run once in external terminal (Admin)",
+    "act.menuCopyCommand": "Copy command",
+    "act.menuCopyPath": "Copy path",
+    "act.menuSettings": "Button settings",
+    "act.menuHide": "Hide",
+    "act.menuShow": "Show",
     "empty.noProject": 'No projects yet — click "+ Add project" to start.',
     "empty.noProjectOption": "(No projects yet)",
     "empty.noAction": 'No actions yet — click "+ Add action" to pick from the scripts folder.',
@@ -1135,6 +1165,11 @@ const I18N = {
     "toast.commandReq": "Command is required",
     "toast.pathCopied": "Directory path copied",
     "toast.copyFailed": "Failed to copy directory path",
+    "toast.commandCopied": "Command copied",
+    "toast.scriptPathCopied": "Script path copied",
+    "toast.copyCommandFailed": "Failed to copy command",
+    "toast.copyScriptPathFailed": "Failed to copy script path",
+    "toast.globalHiddenHint": 'Hidden "{label}". Turn on "Manage actions" to show it again.',
     "confirm.delSvc": 'Delete service "{name}"?',
     "confirm.delProject": 'Delete project "{name}" and all its action settings? (Project files are left untouched.)',
     "confirm.delAction": 'Delete action "{label}"?',
@@ -1376,7 +1411,7 @@ function closePopupMenu({ restoreFocus = false } = {}) {
   menu.innerHTML = "";
 }
 
-function openPopupMenu({ anchorEl = null, targetEl = null, point = null, headerText = "", headerAction = null, items = [], onClose = null }) {
+function openPopupMenu({ anchorEl = null, targetEl = null, point = null, headerText = "", headerAction = null, items = [], onClose = null, contextActionId = null }) {
   const menu = $("popup-menu");
   if (!menu) return;
   if (anchorEl && _popupMenuState && _popupMenuState.anchorEl === anchorEl && isPopupMenuOpen()) {
@@ -1433,6 +1468,7 @@ function openPopupMenu({ anchorEl = null, targetEl = null, point = null, headerT
     btn.type = "button";
     btn.className = "popup-menu-item" + (item.className ? ` ${item.className}` : "");
     btn.setAttribute("role", "menuitem");
+    if (item.isRunItem) btn.dataset.runItem = "1";
     if (item.disabled) {
       btn.disabled = true;
       btn.setAttribute("aria-disabled", "true");
@@ -1508,12 +1544,29 @@ function openPopupMenu({ anchorEl = null, targetEl = null, point = null, headerT
   };
 
   _popupMenuState = {
-    anchorEl, targetEl, onClose, onDocPointerDown, onDocKeyDown, onCloseTrigger, onScroll,
+    anchorEl, targetEl, contextActionId, onClose, onDocPointerDown, onDocKeyDown, onCloseTrigger, onScroll,
   };
   document.addEventListener("pointerdown", onDocPointerDown, true);
   document.addEventListener("keydown", onDocKeyDown, true);
   window.addEventListener("resize", onCloseTrigger);
   window.addEventListener("scroll", onScroll, true);
+}
+
+function syncActionPopupMenuDisabled() {
+  if (!isPopupMenuOpen() || _popupMenuState?.contextActionId == null) return;
+  const action = findActionById(_popupMenuState.contextActionId);
+  if (!action) {
+    closePopupMenu();
+    return;
+  }
+  const disabled = isActionDisabled(action);
+  const menu = $("popup-menu");
+  if (!menu) return;
+  menu.querySelectorAll('.popup-menu-item[data-run-item="1"]').forEach(btn => {
+    btn.disabled = disabled;
+    if (disabled) btn.setAttribute("aria-disabled", "true");
+    else btn.removeAttribute("aria-disabled");
+  });
 }
 
 function getFolderActionLabel() {
@@ -1630,6 +1683,164 @@ function buildProjectContextMenuItems(project) {
   ];
 }
 
+function isAbsolutePath(p) {
+  return /^([A-Za-z]:[\\/]|\\\\|\/)/.test(String(p || ""));
+}
+
+function joinFilePath(base, rel, preferBackslash = state.platform === "win32") {
+  if (!rel) return base || "";
+  if (isAbsolutePath(rel)) return rel;
+  if (!base) return rel;
+  const useBackslash = base.includes("\\") || rel.includes("\\") || preferBackslash;
+  const sep = useBackslash ? "\\" : "/";
+  const norm = s => (useBackslash ? s.replace(/\//g, "\\") : s);
+  const cleanBase = norm(base).replace(/[\\/]+$/, "");
+  const cleanRel = norm(rel).replace(/^[\\/]+/, "");
+  return cleanBase ? `${cleanBase}${sep}${cleanRel}` : cleanRel;
+}
+
+function resolveActionScriptPath(action, project = currentProject()) {
+  if (!action?.script_file) return "";
+  if (action.is_global) return action.resolved_script_path || action.script_file || "";
+  if (isAbsolutePath(action.script_file)) return action.script_file;
+  const baseDir = project
+    ? joinFilePath(project.path || "", project.scripts_dir || "scripts", state.platform === "win32")
+    : (action.scripts_dir || "scripts");
+  return joinFilePath(baseDir, action.script_file, state.platform === "win32");
+}
+
+function quoteShellPath(pathStr) {
+  const s = String(pathStr || "");
+  if (!s) return "";
+  if (/\s/.test(s) && !(s.startsWith('"') && s.endsWith('"'))) return `"${s}"`;
+  return s;
+}
+
+function buildActionCopyPayload(action) {
+  if (!action) return { copyPath: null, copyCommand: null };
+  if (action.command) {
+    return { copyPath: null, copyCommand: action.command };
+  }
+  if (action.script_file) {
+    const fullPath = resolveActionScriptPath(action);
+    const args = (action.arguments || "").trim();
+    return {
+      copyPath: fullPath,
+      copyCommand: args ? `${quoteShellPath(fullPath)} ${args}` : null,
+    };
+  }
+  return { copyPath: null, copyCommand: null };
+}
+
+async function copyActionText(text, okKey, failKey) {
+  if (!text) return;
+  const ok = await copyTextToClipboard(text);
+  if (ok) showToast(t(okKey), "success", 2200);
+  else showToast(t(failKey), "error", 3000);
+}
+
+async function toggleGlobalActionVisibility(actionId, nextHidden, { showHiddenHint = false } = {}) {
+  const action = findActionById(actionId);
+  const label = action?.label || "";
+  try {
+    await api("PUT", `/api/projects/${state.projectId}/hidden-actions/${actionId}`, { hidden: nextHidden });
+    state.globalActions = await api("GET", `/api/global-actions?project_id=${state.projectId}`);
+    renderActions();
+    if (nextHidden && showHiddenHint && !state.actionManageMode) {
+      showToast(t("toast.globalHiddenHint", { label }), "info", 3200);
+    }
+  } catch (err) {
+    showToast(err.message, "error", 3800);
+  }
+}
+
+const ACTION_RUN_ICON_SVG = `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M4.2 2.8a.6.6 0 0 1 .9-.52l8.2 5.2a.6.6 0 0 1 0 1.04l-8.2 5.2a.6.6 0 0 1-.9-.52V2.8z"/></svg>`;
+const ACTION_TERM_ICON_SVG = `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M2 3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H2zm0 1h12v8H2V4zm1.8 1.7l-.7.8L5.3 8.5 3.1 10.5l.7.8L6.7 8.5 3.8 5.7zM7.5 10.3V11.3h4.3v-1H7.5z"/></svg>`;
+const ACTION_ADMIN_ICON_SVG = `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M8 1.5L2.5 3.8v3.9c0 3.4 2.3 6.3 5.5 7.3 3.2-1 5.5-3.9 5.5-7.3V3.8L8 1.5zm0 1.4l4.1 1.7v3.1c0 2.7-1.7 5-4.1 5.9-2.4-.9-4.1-3.2-4.1-5.9V4.6L8 2.9zm0 1.7L5.3 7.4h1.9v3.7h1.6V7.4h1.9L8 4.6z"/></svg>`;
+const ACTION_SETTINGS_ICON_SVG = `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M6.5 1.5h3l.4 1.9a5.2 5.2 0 0 1 1.25.72l1.85-.62 1.5 2.6-1.45 1.3c.06.4.06.8 0 1.2l1.45 1.3-1.5 2.6-1.85-.62a5.2 5.2 0 0 1-1.25.72l-.4 1.9h-3l-.4-1.9a5.2 5.2 0 0 1-1.25-.72L3 12.5l-1.5-2.6 1.45-1.3a5.1 5.1 0 0 1 0-1.2L1.5 6.1 3 3.5l1.85.62c.39-.29.81-.53 1.25-.72l.4-1.9zM8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg>`;
+const ACTION_EYE_OFF_ICON_SVG = `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M2.3 1.4l12.3 12.3-.9.9-2.1-2.1A7.6 7.6 0 0 1 8 13.5c-3.5 0-6.2-2.4-7.3-5.5a7.8 7.8 0 0 1 2.7-3.8L1.4 2.3l.9-.9zm2 3.7A6.5 6.5 0 0 0 2 8c1 2.5 3.2 4.3 6 4.3 1 0 1.9-.2 2.7-.7l-1.3-1.3a2.7 2.7 0 0 1-3.7-3.7L4.3 5.1zM8 2.5c3.5 0 6.2 2.4 7.3 5.5a7.9 7.9 0 0 1-1.9 3l-.9-.9A6.6 6.6 0 0 0 14 8c-1-2.5-3.2-4.3-6-4.3-.7 0-1.3.1-1.9.3l-1-1A7.7 7.7 0 0 1 8 2.5z"/></svg>`;
+const ACTION_EYE_ICON_SVG = `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M8 3C4.5 3 1.8 5.2.7 8c1.1 2.8 3.8 5 7.3 5s6.2-2.2 7.3-5C14.2 5.2 11.5 3 8 3zm0 8.8c-2.8 0-5-1.7-6-3.8 1-2.1 3.2-3.8 6-3.8s5 1.7 6 3.8c-1 2.1-3.2 3.8-6 3.8zm0-6.3a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg>`;
+
+function buildActionContextMenuItems(action, scope, runBtn) {
+  const runDisabled = isActionDisabled(action);
+  const items = [
+    {
+      iconSvg: ACTION_RUN_ICON_SVG,
+      label: t("act.menuRun"),
+      disabled: runDisabled,
+      isRunItem: true,
+      onClick: () => runAction(action.id, runBtn),
+    },
+  ];
+  if (action.execution_mode !== "terminal") {
+    items.push(
+      {
+        iconSvg: ACTION_TERM_ICON_SVG,
+        label: t("act.menuRunTerminal"),
+        disabled: runDisabled,
+        isRunItem: true,
+        onClick: () => runAction(action.id, runBtn, { execution_mode: "terminal", run_as_admin: false }),
+      },
+      {
+        className: "is-admin",
+        iconSvg: ACTION_ADMIN_ICON_SVG,
+        label: t("act.menuRunTerminalAdmin"),
+        disabled: runDisabled,
+        isRunItem: true,
+        onClick: () => runAction(action.id, runBtn, { execution_mode: "terminal", run_as_admin: true }),
+      },
+    );
+  } else if (!action.run_as_admin) {
+    items.push({
+      className: "is-admin",
+      iconSvg: ACTION_ADMIN_ICON_SVG,
+      label: t("act.menuRunTerminalAdmin"),
+      disabled: runDisabled,
+      isRunItem: true,
+      onClick: () => runAction(action.id, runBtn, { execution_mode: "terminal", run_as_admin: true }),
+    });
+  }
+  // 預留擴充點：PCP-16 執行子動作
+
+  const { copyPath, copyCommand } = buildActionCopyPayload(action);
+  if (copyPath || copyCommand) {
+    items.push({ separator: true });
+    if (copyPath) {
+      items.push({
+        iconSvg: COPY_ICON_SVG,
+        label: t("act.menuCopyPath"),
+        onClick: () => copyActionText(copyPath, "toast.scriptPathCopied", "toast.copyScriptPathFailed"),
+      });
+    }
+    if (copyCommand) {
+      items.push({
+        iconSvg: COPY_ICON_SVG,
+        label: t("act.menuCopyCommand"),
+        onClick: () => copyActionText(copyCommand, "toast.commandCopied", "toast.copyCommandFailed"),
+      });
+    }
+  }
+
+  items.push(
+    { separator: true },
+    {
+      iconSvg: ACTION_SETTINGS_ICON_SVG,
+      label: t("act.menuSettings"),
+      onClick: () => openActionDialog(action.id, scope),
+    },
+  );
+  if (scope === "global") {
+    const isHidden = Boolean(action.hidden);
+    items.push({
+      iconSvg: isHidden ? ACTION_EYE_ICON_SVG : ACTION_EYE_OFF_ICON_SVG,
+      label: t(isHidden ? "act.menuShow" : "act.menuHide"),
+      onClick: () => toggleGlobalActionVisibility(action.id, !isHidden, { showHiddenHint: true }),
+    });
+  }
+  // 預留擴充點：按鈕說明對話框
+  return items;
+}
+
 /* ---------- 響應式佈局與側欄／輸出面板控制 ---------- */
 
 const narrowMQ = window.matchMedia("(max-width: 960px)");
@@ -1698,6 +1909,7 @@ function applyActionManageUI() {
 }
 
 function setActionManageMode(on) {
+  closePopupMenu();
   state.actionManageMode = Boolean(on);
   applyActionManageUI();
   if (state.projectId) renderActions();
@@ -2102,19 +2314,27 @@ async function refreshStatus({ resetTimer = false } = {}) {
   scheduleStatusPoll();
 }
 
+function isActionDisabled(action) {
+  const links = action?.services || [];
+  if (!links.length || !links.every(l => state.status.has(l.service_id))) return false;
+  return links.every(l => (l.disable_when === "running") === state.status.get(l.service_id));
+}
+
 function applyButtonStates() {
   // 勾選的條件「全部成立」時停用按鈕；沒有關聯或狀態未知則不停用
   for (const a of state.actions) {
     const btn = document.querySelector(`button.run[data-id="${a.id}"]`);
     if (!btn) continue;
-    const links = a.services || [];
-    let disabled = false;
-    if (links.length && links.every(l => state.status.has(l.service_id))) {
-      disabled = links.every(
-        l => (l.disable_when === "running") === state.status.get(l.service_id));
-    }
+    const disabled = isActionDisabled(a);
     btn.disabled = disabled;
+    const card = btn.closest(".action");
+    if (card) {
+      card.classList.toggle("is-disabled", disabled);
+      if (disabled && btn.title) card.title = btn.title;
+      else card.removeAttribute("title");
+    }
   }
+  syncActionPopupMenuDisabled();
 }
 
 function stopStatusPolling() {
@@ -2332,6 +2552,7 @@ function renderActionPane(scope, actions, box, emptyEl) {
 }
 
 function renderActions() {
+  closePopupMenu();
   renderActionPane("project", state.actions, $("action-list-project"), $("empty-project"));
   renderActionPane("global", state.globalActions, $("action-list-global"), $("empty-global"));
   applyButtonStates();
@@ -2383,7 +2604,20 @@ function finishConfirmRun(confirmed) {
   if (resolve) resolve(Boolean(confirmed));
 }
 
-function confirmRunAction(action) {
+function resolveEffectiveRunMode(action, override = null) {
+  const executionMode = override?.execution_mode ?? action?.execution_mode ?? "panel";
+  let runAsAdmin = false;
+  if (override?.run_as_admin !== undefined && override.run_as_admin !== null) {
+    runAsAdmin = Boolean(override.run_as_admin);
+  } else if (override?.execution_mode === "panel") {
+    runAsAdmin = false;
+  } else {
+    runAsAdmin = Boolean(action?.run_as_admin);
+  }
+  return { executionMode, runAsAdmin };
+}
+
+function confirmRunAction(action, override = null) {
   const dlg = $("confirm-run-dialog");
   if (!dlg || dlg.open) return Promise.resolve(false);
   const projectName = currentProject()?.name || "";
@@ -2394,9 +2628,10 @@ function confirmRunAction(action) {
   $("confirm-run-project").textContent = projectName;
   $("confirm-run-action").textContent = action.label;
   $("confirm-run-command").textContent = formatActionCommand(action);
+  const { executionMode, runAsAdmin } = resolveEffectiveRunMode(action, override);
   $("confirm-run-mode").textContent = t(
-    action.execution_mode === "terminal"
-      ? (action.run_as_admin ? "act.executionTerminalAdmin" : "act.executionTerminal")
+    executionMode === "terminal"
+      ? (runAsAdmin ? "act.executionTerminalAdmin" : "act.executionTerminal")
       : "act.executionPanel"
   );
   const workdir = action.workdir && action.workdir.trim();
@@ -2411,23 +2646,25 @@ function confirmRunAction(action) {
   });
 }
 
-async function runAction(id, btn) {
+async function runAction(id, btn, override = null) {
   // 用 fetch POST 讀 SSE（不用 EventSource：它只能 GET，而 GET 端點擋不住跨站觸發）
-  if (btn.disabled) return;
+  if (!btn || btn.disabled) return;
   let action = findActionById(id);
+  if (action && isActionDisabled(action)) return;
   if (action?.confirm_before_run) {
-    const ok = await confirmRunAction(action);
+    const ok = await confirmRunAction(action, override);
     if (!ok) return;
     const freshBtn = document.querySelector(`button.run[data-id="${id}"]`);
     const freshAction = findActionById(id);
-    if (!freshAction || !freshBtn || freshBtn.disabled) return;
+    if (!freshAction || !freshBtn || freshBtn.disabled || isActionDisabled(freshAction)) return;
     btn = freshBtn;
     action = freshAction;
   }
   if (state.runAbort) state.runAbort.abort();
   document.querySelectorAll(".run.running").forEach(b => b.classList.remove("running"));
   btn.classList.add("running");
-  const isTerminal = action?.execution_mode === "terminal";
+  const { executionMode } = resolveEffectiveRunMode(action, override);
+  const isTerminal = executionMode === "terminal";
   state.outputProjectName = currentProject()?.name || null;
   state.outputLabel = action ? action.label : btn.childNodes[0].textContent.trim();
   renderOutputTitle();
@@ -2435,11 +2672,16 @@ async function runAction(id, btn) {
   if (!isTerminal) setOutputCollapsed(false, { persist: false });
   const ctrl = new AbortController();
   state.runAbort = ctrl;
+  const payload = { project_id: state.projectId };
+  if (override?.execution_mode != null) payload.execution_mode = override.execution_mode;
+  if (override?.run_as_admin !== undefined && override.run_as_admin !== null) {
+    payload.run_as_admin = Boolean(override.run_as_admin);
+  }
   try {
     const res = await fetch(`/api/actions/${id}/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Devdeck-Token": TOKEN() },
-      body: JSON.stringify({ project_id: state.projectId }), signal: ctrl.signal,
+      body: JSON.stringify(payload), signal: ctrl.signal,
     });
     if (res.status === 401) { authLost(); return; }
     if (!res.ok) {
@@ -3057,18 +3299,21 @@ if (typeof ResizeObserver !== "undefined" && $("main-workspace")) {
 
 $("tab-project").onclick = () => {
   if (state.effectiveSplit) return;
+  closePopupMenu();
   state.activeTab = "project";
   localStorage.setItem("devdeck.actionTab", "project");
   applyActionLayout();
 };
 $("tab-global").onclick = () => {
   if (state.effectiveSplit) return;
+  closePopupMenu();
   state.activeTab = "global";
   localStorage.setItem("devdeck.actionTab", "global");
   applyActionLayout();
 };
 $("btn-toggle-split").onclick = () => {
   if ($("btn-toggle-split").disabled) return;
+  closePopupMenu();
   state.splitMode = !state.splitMode;
   localStorage.setItem("devdeck.actionSplit", state.splitMode ? "1" : "0");
   applyActionLayout();
@@ -3252,13 +3497,7 @@ $("action-panes").addEventListener("click", async e => {
   if (hideBtn) {
     const aid = Number(hideBtn.dataset.id);
     const nextHidden = hideBtn.dataset.hidden !== "1";
-    try {
-      await api("PUT", `/api/projects/${state.projectId}/hidden-actions/${aid}`, { hidden: nextHidden });
-      state.globalActions = await api("GET", `/api/global-actions?project_id=${state.projectId}`);
-      renderActions();
-    } catch (err) {
-      toast(err.message);
-    }
+    await toggleGlobalActionVisibility(aid, nextHidden, { showHiddenHint: false });
     return;
   }
   const editBtn = e.target.closest("button.edit");
@@ -3269,6 +3508,24 @@ $("action-panes").addEventListener("click", async e => {
     const catEl = catEditBtn.closest(".category");
     openCategoryDialog(catEl?.dataset.category || "", catEl?.dataset.scope || "project");
   }
+});
+$("action-panes").addEventListener("contextmenu", e => {
+  if (e.shiftKey) return;
+  const card = e.target.closest(".action");
+  if (!card) return;
+  const runBtn = card.querySelector("button.run");
+  const aid = runBtn ? Number(runBtn.dataset.id) : NaN;
+  const action = Number.isFinite(aid) ? findActionById(aid) : null;
+  if (!action) return;
+  const scope = card.closest(".category")?.dataset.scope || (action.is_global ? "global" : "project");
+  e.preventDefault();
+  openPopupMenu({
+    targetEl: card,
+    point: { x: e.clientX, y: e.clientY },
+    headerText: action.label,
+    items: buildActionContextMenuItems(action, scope, runBtn),
+    contextActionId: action.id,
+  });
 });
 
 /* ---------- 資料夾選擇器 ---------- */
