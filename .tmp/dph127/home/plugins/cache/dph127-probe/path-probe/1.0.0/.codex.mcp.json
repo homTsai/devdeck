@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "path-probe": {
+      "command": "C:\\Program Files\\nodejs\\node.EXE",
+      "args": [
+        "./server.mjs"
+      ],
+      "cwd": "."
+    }
+  }
+}

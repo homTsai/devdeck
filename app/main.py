@@ -379,16 +379,19 @@ async def project_status(project_id: int):
     with db.get_conn() as conn:
         services = [dict(r) for r in conn.execute(
             "SELECT * FROM services WHERE project_id=? ORDER BY id", (project_id,))]
-    result = []
-    for svc in services:
+    if not services:
+        return []
+
+    async def _check_service(svc: dict) -> dict:
         listening = await status.port_listening(svc["port"])
         pid = pid_alive = None
         if svc["pid_file"]:
             pid = status.read_pid(Path(project["path"]) / svc["pid_file"])
             if pid is not None:
                 pid_alive = status.pid_alive(pid)
-        result.append({**svc, "listening": listening, "pid": pid, "pid_alive": pid_alive})
-    return result
+        return {**svc, "listening": listening, "pid": pid, "pid_alive": pid_alive}
+
+    return list(await asyncio.gather(*(_check_service(svc) for svc in services)))
 
 
 # ---------- actions ----------

@@ -1,0 +1,2 @@
+{"timestamp":"2026-11-22T04:52:53.526490Z","level":"WARN","fields":{"message":"Failed to list resource templates for MCP server 'path-probe (environment local)': Unexpected response type"},"target":"codex_mcp::connection_manager::resources"}
+{"timestamp":"2026-11-22T04:52:53.527217Z","level":"WARN","fields":{"message":"Failed to list resources for MCP server 'path-probe (environment local)': Unexpected response type"},"target":"codex_mcp::connection_manager::resources"}

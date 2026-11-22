@@ -1,0 +1,13 @@
+{
+  "name": "dph127-probe",
+  "plugins": [
+    {
+      "name": "path-probe",
+      "source": "./plugins/path-probe",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      }
+    }
+  ]
+}

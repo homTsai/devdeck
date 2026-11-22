@@ -897,6 +897,7 @@ const I18N = {
     "cat.metaUncategorized": "將為「未分類」下的 {count} 個動作設定分類。",
     "cat.hintClear": "留空儲存將移除此分類，這 {count} 個動作會歸入「未分類」。",
     "cat.hintMerge": "分類「{target}」已存在，儲存後會將這 {count} 個動作合併至「{target}」的按鈕後方。",
+    "svc.checking": "檢查中…",
     "svc.running": "運行中",
     "svc.stopped": "已停止",
     "svc.pid": "（PID {pid}）",
@@ -1087,6 +1088,7 @@ const I18N = {
     "cat.metaUncategorized": 'This will assign a category to {count} action(s) under "Uncategorized".',
     "cat.hintClear": 'Leaving this blank will remove the category and move {count} action(s) to "Uncategorized".',
     "cat.hintMerge": 'Category "{target}" already exists; saving will merge {count} action(s) after its existing buttons.',
+    "svc.checking": "Checking...",
     "svc.running": "Running",
     "svc.stopped": "Stopped",
     "svc.pid": "(PID {pid})",
@@ -1209,7 +1211,7 @@ function setLang(lang) {
   syncAdminField();
   renderActionTabs();
   applyActionLayout();
-  if (state.projectId) { renderActions(); refreshStatus(); }
+  if (state.projectId) { renderActions(); refreshStatus({ resetTimer: true }); }
   else { $("empty").textContent = t("empty.noProject"); }
 }
 
@@ -1224,7 +1226,7 @@ function setLang(lang) {
 const TOKEN = () => localStorage.getItem("devdeck.token") || "";
 
 function authLost() {
-  clearInterval(state.statusTimer);
+  stopStatusPolling();
   document.body.innerHTML = `<div class="empty" style="margin-top:80px">
     ${t("auth.lost")}<br>
     <small>${t("auth.lostHint")}</small></div>`;
@@ -1242,6 +1244,7 @@ const state = {
   editingCategory: null, editingCategoryScope: "project",
   lastScriptDirSelection: "__abs__",
   editingProject: false, statusTimer: null, runAbort: null,
+  projectSeq: 0, statusSeq: 0, projectAbort: null, statusAbort: null, statusPollingActive: false,
   outputLabel: null, outputProjectName: null,  // 目前輸出面板顯示的動作與來源專案名稱
   sidebarCollapsedWide: localStorage.getItem("devdeck.sidebarCollapsedWide") === "1",
   sidebarDrawerOpen: false,
@@ -1258,7 +1261,7 @@ function findActionById(id) {
   return state.actions.find(a => a.id === id) || state.globalActions.find(a => a.id === id) || null;
 }
 
-async function api(method, url, body) {
+async function api(method, url, body, options = {}) {
   const res = await fetch(url, {
     method,
     headers: {
@@ -1266,6 +1269,7 @@ async function api(method, url, body) {
       ...(body ? { "Content-Type": "application/json" } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
+    signal: options.signal,
   });
   if (res.status === 401) { authLost(); throw new Error("unauthorized"); }
   if (!res.ok) {
@@ -1879,12 +1883,27 @@ function renderProjectList() {
 
 async function selectProject(id) {
   closePopupMenu();
+  const seq = ++state.projectSeq;
+  if (state.projectAbort) {
+    state.projectAbort.abort();
+    state.projectAbort = null;
+  }
+  if (state.statusAbort) {
+    state.statusAbort.abort();
+    state.statusAbort = null;
+  }
+  ++state.statusSeq;
+  clearTimeout(state.statusTimer);
+  state.statusTimer = null;
+
   state.projectId = id;
+  state.services = [];
+  state.status = new Map();
+  $("services").innerHTML = "";
   renderProjectHeader();
   renderProjectList();
   applyActionLayout();
   if (!id) {
-    $("services").innerHTML = "";
     $("action-list-project").innerHTML = "";
     $("action-list-global").innerHTML = "";
     $("empty").hidden = false;
@@ -1893,13 +1912,29 @@ async function selectProject(id) {
   }
   $("empty").hidden = true;
   localStorage.setItem("devdeck.project", id);
-  [state.services, state.actions, state.globalActions] = await Promise.all([
-    api("GET", `/api/projects/${id}/services`),
-    api("GET", `/api/projects/${id}/actions`),
-    api("GET", `/api/global-actions?project_id=${id}`),
-  ]);
+  const ctrl = new AbortController();
+  state.projectAbort = ctrl;
+  let services, actions, globalActions;
+  try {
+    [services, actions, globalActions] = await Promise.all([
+      api("GET", `/api/projects/${id}/services`, undefined, { signal: ctrl.signal }),
+      api("GET", `/api/projects/${id}/actions`, undefined, { signal: ctrl.signal }),
+      api("GET", `/api/global-actions?project_id=${id}`, undefined, { signal: ctrl.signal }),
+    ]);
+  } catch (err) {
+    if (err.name === "AbortError") return;
+    if (state.projectAbort === ctrl) state.projectAbort = null;
+    throw err;
+  }
+  if (state.projectAbort === ctrl) state.projectAbort = null;
+  if (seq !== state.projectSeq || state.projectId !== id) return;
+
+  state.services = services;
+  state.actions = actions;
+  state.globalActions = globalActions;
+  renderServices(state.services, { checking: true });
   renderActions();
-  refreshStatus();
+  refreshStatus({ resetTimer: true });
 }
 
 function currentProject() {
@@ -1908,28 +1943,61 @@ function currentProject() {
 
 /* ---------- 服務狀態 ---------- */
 
-async function refreshStatus() {
-  if (!state.projectId) return;
-  let list;
-  try { list = await api("GET", `/api/projects/${state.projectId}/status`); }
-  catch { return; }
-  state.status = new Map(list.map(s => [s.id, s.listening]));
-  applyButtonStates();
+function renderServices(list, { checking = false } = {}) {
   const box = $("services");
   box.innerHTML = "";
   for (const s of list) {
     const div = document.createElement("div");
     div.className = "svc";
-    const light = s.listening ? "on" : "off";
-    let extra = s.listening ? t("svc.running") : t("svc.stopped");
-    if (s.pid != null) extra += s.pid_alive ? t("svc.pid", { pid: s.pid }) : t("svc.pidStale");
+    const light = checking ? "light" : `light ${s.listening ? "on" : "off"}`;
+    let extra = checking
+      ? t("svc.checking")
+      : (s.listening ? t("svc.running") : t("svc.stopped"));
+    if (!checking && s.pid != null) {
+      extra += s.pid_alive ? t("svc.pid", { pid: s.pid }) : t("svc.pidStale");
+    }
     const open = s.url
-      ? `<a class="svc-open ${s.listening ? "" : "dim"}" href="${esc(s.url)}" target="_blank">${t("svc.open")}</a>`
+      ? `<a class="svc-open ${checking || !s.listening ? "dim" : ""}" href="${esc(s.url)}" target="_blank">${t("svc.open")}</a>`
       : "";
-    div.innerHTML = `<span class="light ${light}"></span><b>${esc(s.name)}</b>
+    div.innerHTML = `<span class="${light}"></span><b>${esc(s.name)}</b>
       <small>:${s.port} ${esc(extra)}</small>${open}`;
     box.appendChild(div);
   }
+}
+
+async function refreshStatus({ resetTimer = false } = {}) {
+  if (resetTimer) {
+    clearTimeout(state.statusTimer);
+    state.statusTimer = null;
+  }
+  const targetProjectId = state.projectId;
+  if (!targetProjectId) return;
+  if (state.statusAbort) {
+    state.statusAbort.abort();
+    state.statusAbort = null;
+  }
+  const ctrl = new AbortController();
+  state.statusAbort = ctrl;
+  const reqSeq = ++state.statusSeq;
+
+  let list;
+  try {
+    list = await api("GET", `/api/projects/${targetProjectId}/status`, undefined, { signal: ctrl.signal });
+  } catch (err) {
+    if (state.statusAbort === ctrl) state.statusAbort = null;
+    if (err.name === "AbortError") return;
+    if (reqSeq === state.statusSeq && state.projectId === targetProjectId) {
+      scheduleStatusPoll();
+    }
+    return;
+  }
+  if (state.statusAbort === ctrl) state.statusAbort = null;
+  if (reqSeq !== state.statusSeq || state.projectId !== targetProjectId) return;
+
+  state.status = new Map(list.map(s => [s.id, s.listening]));
+  applyButtonStates();
+  renderServices(list);
+  scheduleStatusPoll();
 }
 
 function applyButtonStates() {
@@ -1947,10 +2015,43 @@ function applyButtonStates() {
   }
 }
 
-function startStatusPolling() {
-  clearInterval(state.statusTimer);
-  state.statusTimer = setInterval(refreshStatus, 3000);
+function stopStatusPolling() {
+  state.statusPollingActive = false;
+  clearTimeout(state.statusTimer);
+  state.statusTimer = null;
+  if (state.statusAbort) {
+    state.statusAbort.abort();
+    state.statusAbort = null;
+  }
 }
+
+function scheduleStatusPoll() {
+  clearTimeout(state.statusTimer);
+  state.statusTimer = null;
+  if (!state.statusPollingActive || document.hidden || !state.projectId) return;
+  state.statusTimer = setTimeout(() => {
+    state.statusTimer = null;
+    refreshStatus();
+  }, 3000);
+}
+
+function startStatusPolling() {
+  state.statusPollingActive = true;
+  scheduleStatusPoll();
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    clearTimeout(state.statusTimer);
+    state.statusTimer = null;
+    if (state.statusAbort) {
+      state.statusAbort.abort();
+      state.statusAbort = null;
+    }
+  } else if (state.statusPollingActive && state.projectId) {
+    refreshStatus({ resetTimer: true });
+  }
+});
 
 /* ---------- 動作清單 ---------- */
 
@@ -2265,7 +2366,7 @@ async function runAction(id, btn) {
   }
   if (state.runAbort === ctrl) state.runAbort = null;
   btn.classList.remove("running");
-  refreshStatus();
+  refreshStatus({ resetTimer: true });
 }
 
 /* ---------- 專案 dialog ---------- */
@@ -2987,7 +3088,7 @@ $("btn-action-manage").onclick = () => {
 };
 $("btn-shutdown").onclick = async () => {
   if (!confirm(t("confirm.shutdown"))) return;
-  clearInterval(state.statusTimer);
+  stopStatusPolling();
   try { await api("POST", "/api/shutdown"); } catch {}
   document.body.innerHTML =
     `<div class="empty" style="margin-top:80px">${t("shutdown.done")}</div>`;
@@ -3052,8 +3153,8 @@ applyProjectSortUI();
 applyActionManageUI();
 applyOutputUI();
 loadSystemInfo();
-loadProjects();
 startStatusPolling();
+loadProjects();
 </script>
 </body>
 </html>

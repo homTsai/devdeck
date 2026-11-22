@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 
-async def _can_connect(host: str, port: int, timeout: float = 0.5) -> bool:
+async def _can_connect(host: str, port: int, timeout: float = 0.25) -> bool:
     try:
         _, writer = await asyncio.wait_for(
             asyncio.open_connection(host, port), timeout=timeout
@@ -20,14 +20,25 @@ async def _can_connect(host: str, port: int, timeout: float = 0.5) -> bool:
         return False
 
 
-async def port_listening(port: int) -> bool:
-    # 同時探測 IPv4 (127.0.0.1) 與 IPv6 (::1)，避免 Node/Vite 等服務只監聽 [::1] 時誤判為已停止
-    results = await asyncio.gather(
-        _can_connect("127.0.0.1", port),
-        _can_connect("::1", port),
-        return_exceptions=True,
-    )
-    return any(r is True for r in results)
+async def port_listening(port: int, timeout: float = 0.25) -> bool:
+    # 同時探測 IPv4 (127.0.0.1) 與 IPv6 (::1)，任一先連上即短路回傳，避免被未監聽協定卡滿 timeout
+    tasks = [
+        asyncio.create_task(_can_connect("127.0.0.1", port, timeout=timeout)),
+        asyncio.create_task(_can_connect("::1", port, timeout=timeout)),
+    ]
+    try:
+        for done in asyncio.as_completed(tasks):
+            try:
+                if await done:
+                    return True
+            except Exception:
+                pass
+        return False
+    finally:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 def read_pid(pid_path: Path) -> int | None:
