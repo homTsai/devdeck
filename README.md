@@ -91,7 +91,7 @@ Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘
    （例：start 按鈕勾 fastapi「運行中時停用」→ 服務在跑就按不了；dev stop 勾兩個服務
    「停止時停用」→ 兩個都停了才鎖住，只剩一個在跑仍可按）。
 4. 日常使用：選專案 → 點按鈕 → 下方面板即時串流輸出。
-5. 勾選右上角**管理模式**才會顯示編輯/刪除按鈕，避免誤觸。
+5. 開啟按鈕面板右上角的**動作管理**開關才會顯示編輯／隱藏按鈕與分類排序，避免誤觸；專案面板標題列的排序圖示則用於拖曳調整專案順序。
 
 ### 設計說明
 
@@ -259,7 +259,7 @@ when cloned via a GUI tool such as Sourcetree). Clear it any one of three ways:
    up; a combined dev-stop checked with both services "disable while stopped" only locks when
    both are down).
 4. Daily use: pick a project → click a button → output streams live in the bottom panel.
-5. Enable **manage mode** (top right) to reveal edit/delete buttons and avoid accidental clicks.
+5. Enable the **Manage actions** switch at the top right of the action panel to reveal edit/hide buttons and category reordering without accidental clicks, and use the sort icon in the project sidebar header to reorder projects.
 
 ### Design notes
 

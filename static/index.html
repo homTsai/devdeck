@@ -36,17 +36,22 @@
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   button.danger { color: var(--red); }
   .icon-btn {
+    display: inline-flex; align-items: center; justify-content: center;
     background: transparent; border: 1px solid transparent; color: var(--muted);
     padding: 3px 7px; border-radius: 5px; font-size: 13px; line-height: 1.2;
   }
   .icon-btn:hover { color: var(--text); background: var(--hover); border-color: var(--border); }
+  .icon-btn.active, .icon-btn[aria-pressed="true"] {
+    color: #fff; background: rgba(79,140,255,.22); border-color: var(--accent);
+  }
+  .icon-btn:disabled { opacity: .35; cursor: not-allowed; }
+  .icon-btn:disabled:hover { color: var(--muted); background: transparent; border-color: transparent; }
   #btn-sidebar-toggle {
     display: inline-flex; align-items: center; gap: 6px;
     max-width: 260px; min-width: 0; font-weight: 500;
   }
   .sidebar-toggle-icon { flex: none; color: var(--muted); }
   #header-project-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .manage-label { color: var(--muted); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; cursor: pointer; }
   .spacer { flex: 1; }
 
   /* 主工作區：左側專案欄 + 中欄（專案列＋按鈕） + 右側輸出 */
@@ -102,12 +107,12 @@
     background: rgba(255,255,255,.05); flex: none;
   }
   .project-handle:hover { color: var(--text); background: var(--hover); }
-  body.manage .project-handle { display: inline-flex; align-items: center; }
-  body.manage .project-item { cursor: grab; }
-  body.manage .project-item:active { cursor: grabbing; }
-  body.manage .project-item.dragging { opacity: .35; }
-  body.manage .project-item.drag-over-top { box-shadow: 0 -2px 0 0 var(--accent); }
-  body.manage .project-item.drag-over-bottom { box-shadow: 0 2px 0 0 var(--accent); }
+  #project-sidebar.is-sorting .project-handle { display: inline-flex; align-items: center; }
+  #project-sidebar.is-sorting .project-item { cursor: grab; }
+  #project-sidebar.is-sorting .project-item:active { cursor: grabbing; }
+  #project-sidebar.is-sorting .project-item.dragging { opacity: .35; }
+  #project-sidebar.is-sorting .project-item.drag-over-top { box-shadow: 0 -2px 0 0 var(--accent); }
+  #project-sidebar.is-sorting .project-item.drag-over-bottom { box-shadow: 0 2px 0 0 var(--accent); }
   .sidebar-foot {
     padding: 10px; border-top: 1px solid var(--border); flex: none;
   }
@@ -144,6 +149,30 @@
   }
   .project-icon-btn:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
   .project-dir-caret { opacity: .78; }
+  .action-panel-controls {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: none;
+  }
+  .switch-control {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: transparent; border: 1px solid var(--border); border-radius: 999px;
+    padding: 4px 10px 4px 6px; font-size: 13px; color: var(--muted);
+    white-space: nowrap; transition: border-color .15s ease, color .15s ease, background .15s ease;
+  }
+  .switch-control:hover { color: var(--text); border-color: var(--accent); background: var(--hover); }
+  .switch-control:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+  .switch-control[aria-checked="true"] {
+    color: var(--text); border-color: var(--accent); background: rgba(79,140,255,.14);
+  }
+  .switch-track {
+    position: relative; width: 30px; height: 17px; border-radius: 999px; flex: none;
+    background: var(--border); transition: background .18s ease;
+  }
+  .switch-thumb {
+    position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%;
+    background: #d8d9e0; transition: transform .18s ease, background .18s ease;
+  }
+  .switch-control[aria-checked="true"] .switch-track { background: var(--accent); }
+  .switch-control[aria-checked="true"] .switch-thumb { transform: translateX(13px); background: #fff; }
   #content { flex: 1; overflow-y: auto; padding: 16px; min-height: 0; }
   .empty { color: var(--muted); text-align: center; margin-top: 60px; }
 
@@ -183,7 +212,7 @@
   }
   .category-handle:hover { color: var(--text); background: var(--hover); }
   .category-handle:active { cursor: grabbing; }
-  body.manage .category-handle { display: inline-flex; align-items: center; }
+  #center-pane.is-managing-actions .category-handle { display: inline-flex; align-items: center; }
   .category-edit {
     display: none; border: none; background: transparent; color: var(--muted);
     padding: 2px 5px; border-radius: 4px; cursor: pointer; line-height: 1;
@@ -191,16 +220,16 @@
   .category-edit:hover, .category-edit:focus-visible {
     color: var(--text); background: var(--hover); outline: none;
   }
-  body.manage .category-edit {
+  #center-pane.is-managing-actions .category-edit {
     display: inline-flex; align-items: center; justify-content: center;
   }
-  body.manage .category-header { cursor: grab; }
-  body.manage .category-header:active { cursor: grabbing; }
-  body.manage .category.dragging { opacity: .3; }
-  body.manage .category.drag-over-top {
+  #center-pane.is-managing-actions .category-header { cursor: grab; }
+  #center-pane.is-managing-actions .category-header:active { cursor: grabbing; }
+  #center-pane.is-managing-actions .category.dragging { opacity: .3; }
+  #center-pane.is-managing-actions .category.drag-over-top {
     box-shadow: 0 -3px 0 0 var(--accent);
   }
-  body.manage .category.drag-over-bottom {
+  #center-pane.is-managing-actions .category.drag-over-bottom {
     box-shadow: 0 3px 0 0 var(--accent);
   }
   .actions { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -225,7 +254,7 @@
   .action > .run:disabled { opacity: .35; cursor: not-allowed; }
   .action > .run:disabled:hover { background: none; }
   .action .mgmt { display: none; }
-  body.manage .action .mgmt {
+  #center-pane.is-managing-actions .action .mgmt {
     display: flex; flex-direction: column; border-left: 1px solid var(--border);
   }
   .action .mgmt button { border: none; border-radius: 0; padding: 2px 8px; flex: 1; font-size: 12px; }
@@ -478,7 +507,6 @@
     <option value="zh-TW">中文</option>
     <option value="en">English</option>
   </select>
-  <label class="manage-label"><input type="checkbox" id="manage-toggle"> <span data-i18n="header.manageMode">管理模式</span></label>
   <button id="btn-shutdown" data-i18n="header.shutdown" data-i18n-title="header.shutdownTitle" title="停止 devdeck 伺服器" class="danger">關閉工具</button>
 </header>
 
@@ -488,6 +516,9 @@
     <div class="sidebar-head">
       <span class="sidebar-title" data-i18n="sidebar.projects">專案</span>
       <span class="spacer"></span>
+      <button type="button" id="btn-project-sort" class="icon-btn" aria-pressed="false" title="排序專案" aria-label="排序專案">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M5.5 2.25a.6.6 0 0 1 .42.18l2.5 2.5a.6.6 0 1 1-.84.84L6.1 4.3v8.95a.6.6 0 0 1-1.2 0V4.3L3.42 5.77a.6.6 0 1 1-.84-.84l2.5-2.5a.6.6 0 0 1 .42-.18zm5 11.5a.6.6 0 0 1-.42-.18l-2.5-2.5a.6.6 0 1 1 .84-.84l1.48 1.47V2.75a.6.6 0 0 1 1.2 0v8.95l1.48-1.47a.6.6 0 1 1 .84.84l-2.5 2.5a.6.6 0 0 1-.42.18z"/></svg>
+      </button>
       <button type="button" id="btn-sidebar-pin" class="icon-btn" hidden data-i18n-title="sidebar.pin" title="固定顯示側欄">⇥</button>
       <button type="button" id="btn-sidebar-close" class="icon-btn" data-i18n-title="sidebar.collapse" title="收合專案清單">«</button>
     </div>
@@ -510,7 +541,11 @@
           </button>
         </div>
         <span class="spacer"></span>
-        <div class="action-panel-controls" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:none;">
+        <div class="action-panel-controls">
+          <button type="button" id="btn-action-manage" class="switch-control" role="switch" aria-checked="false">
+            <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+            <span class="switch-label" data-i18n="actions.manageMode">動作管理</span>
+          </button>
           <button type="button" id="btn-add-action" data-i18n="header.addAction">＋ 新增動作</button>
         </div>
       </div>
@@ -743,7 +778,9 @@ const I18N = {
     "header.editProject": "專案設定",
     "header.addAction": "＋ 新增動作",
     "header.addGlobalAction": "＋ 新增通用動作",
-    "header.manageMode": "管理模式",
+    "actions.manageMode": "動作管理",
+    "actions.manageModeOffTitle": "開啟動作管理（編輯、隱藏動作與分類排序）",
+    "actions.manageModeOnTitle": "關閉動作管理",
     "tabs.global": "通用",
     "tabs.splitEnable": "並列顯示",
     "tabs.splitDisable": "分頁顯示",
@@ -756,6 +793,9 @@ const I18N = {
     "header.shutdown": "關閉工具",
     "header.shutdownTitle": "停止 devdeck 伺服器",
     "sidebar.projects": "專案",
+    "sidebar.sort": "排序專案",
+    "sidebar.sortDone": "結束排序",
+    "sidebar.sortDisabled": "至少需要 2 個專案才能排序",
     "sidebar.toggleTitle": "切換專案清單",
     "sidebar.collapse": "收合專案清單",
     "sidebar.close": "關閉專案清單",
@@ -845,7 +885,7 @@ const I18N = {
     "empty.noProjectOption": "（尚無專案）",
     "empty.noAction": "此專案還沒有動作，按「＋ 新增動作」從腳本目錄挑選。",
     "empty.noGlobalAction": "還沒有通用按鈕，按「＋ 新增通用動作」建立跨專案共用指令或腳本。",
-    "empty.allGlobalHidden": "此專案已隱藏所有通用按鈕；開啟「管理模式」可重新顯示。",
+    "empty.allGlobalHidden": "此專案已隱藏所有通用按鈕；開啟「動作管理」可重新顯示。",
     "cat.uncategorized": "未分類",
     "cat.dragHint": "拖曳調整分類順序",
     "cat.editHint": "編輯分類名稱",
@@ -928,7 +968,9 @@ const I18N = {
     "header.editProject": "Project settings",
     "header.addAction": "+ Add action",
     "header.addGlobalAction": "+ Add global action",
-    "header.manageMode": "Manage mode",
+    "actions.manageMode": "Manage actions",
+    "actions.manageModeOffTitle": "Enable action management (edit/hide actions and reorder categories)",
+    "actions.manageModeOnTitle": "Disable action management",
     "tabs.global": "Global",
     "tabs.splitEnable": "Side-by-side",
     "tabs.splitDisable": "Tabs view",
@@ -941,6 +983,9 @@ const I18N = {
     "header.shutdown": "Shut down",
     "header.shutdownTitle": "Stop the devdeck server",
     "sidebar.projects": "Projects",
+    "sidebar.sort": "Reorder projects",
+    "sidebar.sortDone": "Done reordering",
+    "sidebar.sortDisabled": "At least 2 projects are required to reorder",
     "sidebar.toggleTitle": "Toggle project list",
     "sidebar.collapse": "Collapse project sidebar",
     "sidebar.close": "Close project list",
@@ -1030,7 +1075,7 @@ const I18N = {
     "empty.noProjectOption": "(No projects yet)",
     "empty.noAction": 'No actions yet — click "+ Add action" to pick from the scripts folder.',
     "empty.noGlobalAction": 'No global actions yet — click "+ Add global action" to create a shared command or script.',
-    "empty.allGlobalHidden": 'All global actions are hidden for this project. Turn on "Manage mode" to unhide.',
+    "empty.allGlobalHidden": 'All global actions are hidden for this project. Turn on "Manage actions" to unhide.',
     "cat.uncategorized": "Uncategorized",
     "cat.dragHint": "Drag to reorder category",
     "cat.editHint": "Edit category name",
@@ -1158,6 +1203,8 @@ function setLang(lang) {
   renderProjectHeader();
   renderProjectList();
   applySidebarUI();
+  applyProjectSortUI();
+  applyActionManageUI();
   applyOutputUI();
   syncAdminField();
   renderActionTabs();
@@ -1198,6 +1245,8 @@ const state = {
   outputLabel: null, outputProjectName: null,  // 目前輸出面板顯示的動作與來源專案名稱
   sidebarCollapsedWide: localStorage.getItem("devdeck.sidebarCollapsedWide") === "1",
   sidebarDrawerOpen: false,
+  projectSortMode: false,
+  actionManageMode: false,
   outputCollapsed: {
     wide: localStorage.getItem("devdeck.outputCollapsedWide") === "1",
     narrow: localStorage.getItem("devdeck.outputCollapsedNarrow") !== "0",
@@ -1457,6 +1506,16 @@ async function copyProjectPath(project) {
 function buildProjectDirMenuItems(project) {
   return [
     {
+      iconSvg: `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M10.5 1.5h-6A1.5 1.5 0 0 0 3 3v8.5h1.2V3a.3.3 0 0 1 .3-.3h6V1.5zm2 2.5h-6A1.5 1.5 0 0 0 5 5.5v8A1.5 1.5 0 0 0 6.5 15h6A1.5 1.5 0 0 0 14 13.5v-8A1.5 1.5 0 0 0 12.5 4zm.3 9.5a.3.3 0 0 1-.3.3h-6a.3.3 0 0 1-.3-.3v-8a.3.3 0 0 1 .3-.3h6a.3.3 0 0 1 .3.3v8z"/></svg>`,
+      label: t("proj.copyPath"),
+      onClick: () => copyProjectPath(project),
+    },
+    {
+      iconSvg: `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M1.75 2.5A1.25 1.25 0 0 0 .5 3.75v8.5c0 .69.56 1.25 1.25 1.25h12.5c.69 0 1.25-.56 1.25-1.25v-6.5c0-.69-.56-1.25-1.25-1.25H7.81l-1.2-1.5A1.25 1.25 0 0 0 5.63 2.5H1.75zm0 1.25h3.88l1.2 1.5c.24.3.6.47.98.47h6.44v6.53H1.75V3.75z"/></svg>`,
+      label: getFolderActionLabel(),
+      onClick: () => openProjectFolder(project),
+    },
+    {
       iconSvg: `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M2 3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H2zm0 1h12v8H2V4zm1.8 1.7l-.7.8L5.3 8.5 3.1 10.5l.7.8L6.7 8.5 3.8 5.7zM7.5 10.3V11.3h4.3v-1H7.5z"/></svg>`,
       label: t("proj.openTerminal"),
       onClick: () => openProjectTerminal(project, false),
@@ -1466,16 +1525,6 @@ function buildProjectDirMenuItems(project) {
       iconSvg: `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M8 1.5L2.5 3.8v3.9c0 3.4 2.3 6.3 5.5 7.3 3.2-1 5.5-3.9 5.5-7.3V3.8L8 1.5zm0 1.4l4.1 1.7v3.1c0 2.7-1.7 5-4.1 5.9-2.4-.9-4.1-3.2-4.1-5.9V4.6L8 2.9zm0 1.7L5.3 7.4h1.9v3.7h1.6V7.4h1.9L8 4.6z"/></svg>`,
       label: t("proj.openTerminalAdmin"),
       onClick: () => openProjectTerminal(project, true),
-    },
-    {
-      iconSvg: `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M1.75 2.5A1.25 1.25 0 0 0 .5 3.75v8.5c0 .69.56 1.25 1.25 1.25h12.5c.69 0 1.25-.56 1.25-1.25v-6.5c0-.69-.56-1.25-1.25-1.25H7.81l-1.2-1.5A1.25 1.25 0 0 0 5.63 2.5H1.75zm0 1.25h3.88l1.2 1.5c.24.3.6.47.98.47h6.44v6.53H1.75V3.75z"/></svg>`,
-      label: getFolderActionLabel(),
-      onClick: () => openProjectFolder(project),
-    },
-    {
-      iconSvg: `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M10.5 1.5h-6A1.5 1.5 0 0 0 3 3v8.5h1.2V3a.3.3 0 0 1 .3-.3h6V1.5zm2 2.5h-6A1.5 1.5 0 0 0 5 5.5v8A1.5 1.5 0 0 0 6.5 15h6A1.5 1.5 0 0 0 14 13.5v-8A1.5 1.5 0 0 0 12.5 4zm.3 9.5a.3.3 0 0 1-.3.3h-6a.3.3 0 0 1-.3-.3v-8a.3.3 0 0 1 .3-.3h6a.3.3 0 0 1 .3.3v8z"/></svg>`,
-      label: t("proj.copyPath"),
-      onClick: () => copyProjectPath(project),
     },
   ];
 }
@@ -1508,6 +1557,49 @@ function applySidebarUI() {
   closeBtn.textContent = overlay ? "✕" : "«";
   closeBtn.title = t(overlay ? "sidebar.close" : "sidebar.collapse");
   toggleBtn.setAttribute("aria-expanded", String(overlay ? open : true));
+  if (overlay && !open && state.projectSortMode) {
+    setProjectSortMode(false);
+  }
+}
+
+function applyProjectSortUI() {
+  const sidebar = $("project-sidebar");
+  const btn = $("btn-project-sort");
+  const canSort = state.projects.length >= 2;
+  if (!canSort && state.projectSortMode) state.projectSortMode = false;
+  if (sidebar) sidebar.classList.toggle("is-sorting", state.projectSortMode);
+  if (btn) {
+    btn.disabled = !canSort;
+    btn.classList.toggle("active", state.projectSortMode);
+    btn.setAttribute("aria-pressed", String(state.projectSortMode));
+    const label = t(!canSort ? "sidebar.sortDisabled" : (state.projectSortMode ? "sidebar.sortDone" : "sidebar.sort"));
+    btn.title = label;
+    btn.setAttribute("aria-label", label);
+  }
+  document.querySelectorAll("#project-list .project-item").forEach(el => {
+    el.draggable = state.projectSortMode;
+  });
+}
+
+function setProjectSortMode(on) {
+  state.projectSortMode = Boolean(on) && state.projects.length >= 2;
+  applyProjectSortUI();
+}
+
+function applyActionManageUI() {
+  const pane = $("center-pane");
+  const btn = $("btn-action-manage");
+  if (pane) pane.classList.toggle("is-managing-actions", state.actionManageMode);
+  if (btn) {
+    btn.setAttribute("aria-checked", String(state.actionManageMode));
+    btn.title = t(state.actionManageMode ? "actions.manageModeOnTitle" : "actions.manageModeOffTitle");
+  }
+}
+
+function setActionManageMode(on) {
+  state.actionManageMode = Boolean(on);
+  applyActionManageUI();
+  if (state.projectId) renderActions();
 }
 
 const OUTPUT_MIN_WIDTH = 260;
@@ -1688,14 +1780,15 @@ function renderProjectList() {
     empty.className = "sidebar-empty";
     empty.textContent = t("empty.noProjectOption");
     box.appendChild(empty);
+    applyProjectSortUI();
     return;
   }
-  const managing = document.body.classList.contains("manage");
+  const sorting = state.projectSortMode;
   for (const p of state.projects) {
     const item = document.createElement("div");
     item.className = "project-item" + (p.id === state.projectId ? " active" : "");
     item.dataset.id = p.id;
-    item.draggable = managing;
+    item.draggable = sorting;
     item.setAttribute("role", "option");
     item.setAttribute("aria-selected", String(p.id === state.projectId));
     item.innerHTML = `
@@ -1703,7 +1796,7 @@ function renderProjectList() {
       <span class="project-name" title="${esc(p.name)}">${esc(p.name)}</span>`;
 
     item.onclick = async () => {
-      if ((isNarrow() || state.sidebarCollapsedWide) && !document.body.classList.contains("manage")) {
+      if ((isNarrow() || state.sidebarCollapsedWide) && !state.projectSortMode) {
         state.sidebarDrawerOpen = false;
         applySidebarUI();
       }
@@ -1711,7 +1804,7 @@ function renderProjectList() {
     };
 
     item.ondragstart = e => {
-      if (!document.body.classList.contains("manage")) {
+      if (!state.projectSortMode) {
         e.preventDefault();
         return;
       }
@@ -1733,11 +1826,11 @@ function renderProjectList() {
       });
     };
     item.ondragenter = e => {
-      if (!document.body.classList.contains("manage") || !window._draggedProject) return;
+      if (!state.projectSortMode || !window._draggedProject) return;
       e.preventDefault();
     };
     item.ondragover = e => {
-      if (!document.body.classList.contains("manage") || !window._draggedProject) return;
+      if (!state.projectSortMode || !window._draggedProject) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
       if (window._draggedProject === item) return;
@@ -1756,7 +1849,7 @@ function renderProjectList() {
       }
     };
     item.ondrop = async e => {
-      if (!document.body.classList.contains("manage") || !window._draggedProject) return;
+      if (!state.projectSortMode || !window._draggedProject) return;
       e.preventDefault();
       const dragged = window._draggedProject;
       item.classList.remove("drag-over-top", "drag-over-bottom");
@@ -1781,6 +1874,7 @@ function renderProjectList() {
 
     box.appendChild(item);
   }
+  applyProjectSortUI();
 }
 
 async function selectProject(id) {
@@ -1879,7 +1973,7 @@ function normCategory(cat) {
 
 function renderActionPane(scope, actions, box, emptyEl) {
   box.innerHTML = "";
-  const managing = document.body.classList.contains("manage");
+  const managing = state.actionManageMode;
   const visibleActions = scope === "global" && !managing
     ? actions.filter(a => !a.hidden)
     : actions;
@@ -1909,7 +2003,7 @@ function renderActionPane(scope, actions, box, emptyEl) {
 
     const displayCat = rawCat || t("cat.uncategorized");
     div.innerHTML = `
-      <div class="category-header" draggable="true">
+      <div class="category-header" draggable="${managing ? "true" : "false"}">
         <span class="category-handle" title="${esc(t("cat.dragHint"))}">⠿</span>
         <h2>${esc(displayCat)}</h2>
         <button type="button" class="category-edit" draggable="false" title="${esc(t("cat.editHint"))}" aria-label="${esc(t("cat.editHint"))}">
@@ -1951,7 +2045,7 @@ function renderActionPane(scope, actions, box, emptyEl) {
     div.appendChild(row);
 
     header.ondragstart = e => {
-      if (!document.body.classList.contains("manage")
+      if (!state.actionManageMode
           || (e.target && e.target.closest && e.target.closest(".category-edit"))) {
         e.preventDefault();
         return;
@@ -1976,11 +2070,11 @@ function renderActionPane(scope, actions, box, emptyEl) {
       });
     };
     div.ondragenter = e => {
-      if (!document.body.classList.contains("manage") || !window._draggedCategory || window._draggedCategoryScope !== scope) return;
+      if (!state.actionManageMode || !window._draggedCategory || window._draggedCategoryScope !== scope) return;
       e.preventDefault();
     };
     div.ondragover = e => {
-      if (!document.body.classList.contains("manage") || !window._draggedCategory || window._draggedCategoryScope !== scope) return;
+      if (!state.actionManageMode || !window._draggedCategory || window._draggedCategoryScope !== scope) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
       if (window._draggedCategory === div) return;
@@ -2001,7 +2095,7 @@ function renderActionPane(scope, actions, box, emptyEl) {
       }
     };
     div.ondrop = async e => {
-      if (!document.body.classList.contains("manage") || !window._draggedCategory || window._draggedCategoryScope !== scope) return;
+      if (!state.actionManageMode || !window._draggedCategory || window._draggedCategoryScope !== scope) return;
       e.preventDefault();
       const dragged = window._draggedCategory;
       div.classList.remove("drag-over-top", "drag-over-bottom");
@@ -2884,13 +2978,12 @@ $("btn-del-action").onclick = async () => {
   $("action-dialog").close();
   await selectProject(state.projectId);
 };
-$("manage-toggle").onchange = e => {
-  const on = e.target.checked;
-  document.body.classList.toggle("manage", on);
-  document.querySelectorAll("#project-list .project-item").forEach(el => {
-    el.draggable = on;
-  });
-  if (state.projectId) renderActions();
+$("btn-project-sort").onclick = () => {
+  if ($("btn-project-sort").disabled) return;
+  setProjectSortMode(!state.projectSortMode);
+};
+$("btn-action-manage").onclick = () => {
+  setActionManageMode(!state.actionManageMode);
 };
 $("btn-shutdown").onclick = async () => {
   if (!confirm(t("confirm.shutdown"))) return;
@@ -2955,6 +3048,8 @@ wirePick("browse-a-workdir", "a-workdir", "pick.workdir", () => $("a-workdir").v
 
 setLang(detectLang());
 applySidebarUI();
+applyProjectSortUI();
+applyActionManageUI();
 applyOutputUI();
 loadSystemInfo();
 loadProjects();

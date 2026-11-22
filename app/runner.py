@@ -8,6 +8,8 @@ import shlex
 import shutil
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 
 
@@ -334,11 +336,162 @@ def open_external_terminal(
     raise RunError("err.noExternalTerminal")
 
 
+def _list_win_explorer_windows() -> list[tuple[int, str]]:
+    """列舉目前可見的 Windows 檔案總管（CabinetWClass）視窗。"""
+    if sys.platform != "win32":
+        return []
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        user32.EnumWindows.argtypes = [WNDENUMPROC, wintypes.LPARAM]
+        user32.EnumWindows.restype = wintypes.BOOL
+        user32.IsWindowVisible.argtypes = [wintypes.HWND]
+        user32.IsWindowVisible.restype = wintypes.BOOL
+        user32.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+        user32.GetClassNameW.restype = ctypes.c_int
+        user32.GetWindowTextLengthW.argtypes = [wintypes.HWND]
+        user32.GetWindowTextLengthW.restype = ctypes.c_int
+        user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+        user32.GetWindowTextW.restype = ctypes.c_int
+
+        windows: list[tuple[int, str]] = []
+        cls_buf = ctypes.create_unicode_buffer(64)
+
+        @WNDENUMPROC
+        def _enum_cb(hwnd, _lparam):
+            if not user32.IsWindowVisible(hwnd):
+                return True
+            if user32.GetClassNameW(hwnd, cls_buf, 64) > 0 and cls_buf.value == "CabinetWClass":
+                length = user32.GetWindowTextLengthW(hwnd)
+                title = ""
+                if length > 0:
+                    title_buf = ctypes.create_unicode_buffer(length + 1)
+                    user32.GetWindowTextW(hwnd, title_buf, length + 1)
+                    title = title_buf.value
+                windows.append((int(hwnd), title))
+            return True
+
+        user32.EnumWindows(_enum_cb, 0)
+        return windows
+    except Exception:
+        return []
+
+
+def _bring_win_window_to_front(hwnd: int) -> None:
+    """將指定 Windows 視窗帶到前景，避免僅在工作列閃爍。"""
+    import ctypes
+    from ctypes import wintypes
+
+    SW_SHOW = 5
+    SW_RESTORE = 9
+    SWP_NOSIZE = 0x0001
+    SWP_NOMOVE = 0x0002
+    SWP_SHOWWINDOW = 0x0040
+    HWND_TOPMOST = wintypes.HWND(-1)
+    HWND_NOTOPMOST = wintypes.HWND(-2)
+
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+
+    user32.IsIconic.argtypes = [wintypes.HWND]
+    user32.IsIconic.restype = wintypes.BOOL
+    user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.ShowWindow.restype = wintypes.BOOL
+    user32.GetForegroundWindow.argtypes = []
+    user32.GetForegroundWindow.restype = wintypes.HWND
+    user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+    kernel32.GetCurrentThreadId.argtypes = []
+    kernel32.GetCurrentThreadId.restype = wintypes.DWORD
+    user32.AttachThreadInput.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.BOOL]
+    user32.AttachThreadInput.restype = wintypes.BOOL
+    user32.SetWindowPos.argtypes = [
+        wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
+        ctypes.c_int, ctypes.c_int, wintypes.UINT,
+    ]
+    user32.SetWindowPos.restype = wintypes.BOOL
+    user32.BringWindowToTop.argtypes = [wintypes.HWND]
+    user32.BringWindowToTop.restype = wintypes.BOOL
+    user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+    user32.SetForegroundWindow.restype = wintypes.BOOL
+
+    target = wintypes.HWND(hwnd)
+    if user32.IsIconic(target):
+        user32.ShowWindow(target, SW_RESTORE)
+    else:
+        user32.ShowWindow(target, SW_SHOW)
+
+    fg_hwnd = user32.GetForegroundWindow()
+    fg_tid = user32.GetWindowThreadProcessId(fg_hwnd, None) if fg_hwnd else 0
+    cur_tid = kernel32.GetCurrentThreadId()
+    attached = False
+    if fg_tid and fg_tid != cur_tid:
+        attached = bool(user32.AttachThreadInput(cur_tid, fg_tid, True))
+    try:
+        flags = SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW
+        user32.SetWindowPos(target, HWND_TOPMOST, 0, 0, 0, 0, flags)
+        try:
+            user32.BringWindowToTop(target)
+            user32.SetForegroundWindow(target)
+        finally:
+            user32.SetWindowPos(target, HWND_NOTOPMOST, 0, 0, 0, 0, flags)
+    finally:
+        if attached:
+            user32.AttachThreadInput(cur_tid, fg_tid, False)
+
+
+def _focus_win_explorer_after_open(
+    path: str,
+    before: list[tuple[int, str]],
+    timeout: float = 1.5,
+    poll_interval: float = 0.05,
+) -> None:
+    """背景輪詢剛開啟或切換分頁的檔案總管視窗，並將其帶到前景。"""
+    try:
+        before_map = dict(before)
+        norm = os.path.normpath(path)
+        target_hint = (Path(norm).name or norm.rstrip("\\")).lower()
+        deadline = time.monotonic() + timeout
+        start = time.monotonic()
+
+        while time.monotonic() < deadline:
+            current = _list_win_explorer_windows()
+            for hwnd, _title in current:
+                if hwnd not in before_map:
+                    _bring_win_window_to_front(hwnd)
+                    return
+
+            for hwnd, title in current:
+                if before_map.get(hwnd) != title and (not target_hint or target_hint in title.lower()):
+                    _bring_win_window_to_front(hwnd)
+                    return
+
+            if time.monotonic() - start >= 0.35 and target_hint:
+                for hwnd, title in current:
+                    if target_hint in title.lower():
+                        _bring_win_window_to_front(hwnd)
+                        return
+
+            time.sleep(poll_interval)
+    except Exception:
+        pass
+
+
 def open_folder(path: str) -> None:
     """以系統預設檔案管理員開啟指定資料夾。"""
     try:
         if sys.platform == "win32":
-            os.startfile(path)
+            norm_path = os.path.normpath(path)
+            before = _list_win_explorer_windows()
+            os.startfile(norm_path)
+            threading.Thread(
+                target=_focus_win_explorer_after_open,
+                args=(norm_path, before),
+                daemon=True,
+            ).start()
             return
         if sys.platform == "darwin":
             subprocess.Popen(["open", path])
