@@ -1471,6 +1471,7 @@ const state = {
   projectSeq: 0, statusSeq: 0, projectAbort: null, statusAbort: null, statusPollingActive: false,
   outputLabel: null, outputProjectName: null,  // 目前輸出面板顯示的動作與來源專案名稱
   sidebarCollapsedWide: localStorage.getItem("devdeck.sidebarCollapsedWide") === "1",
+  sidebarAutoCollapsedByMax: localStorage.getItem("devdeck.sidebarAutoCollapsedByMax") === "1",
   sidebarDrawerOpen: false,
   projectSortMode: false,
   categorySortMode: false,
@@ -2338,11 +2339,39 @@ function applyOutputWidth() {
   syncOutputWidthPresetButtons();
 }
 
+function clearSidebarAutoCollapseFlag() {
+  state.sidebarAutoCollapsedByMax = false;
+  localStorage.removeItem("devdeck.sidebarAutoCollapsedByMax");
+}
+
+function autoCollapseSidebarForMaxOutput() {
+  if (isNarrow() || state.sidebarCollapsedWide) return false;
+  state.sidebarCollapsedWide = true;
+  state.sidebarDrawerOpen = false;
+  state.sidebarAutoCollapsedByMax = true;
+  localStorage.setItem("devdeck.sidebarCollapsedWide", "1");
+  localStorage.setItem("devdeck.sidebarAutoCollapsedByMax", "1");
+  applySidebarUI();
+  return true;
+}
+
+function restoreAutoCollapsedSidebarIfNeeded() {
+  if (!state.sidebarAutoCollapsedByMax) return false;
+  clearSidebarAutoCollapseFlag();
+  if (isNarrow() || !state.sidebarCollapsedWide) return false;
+  state.sidebarCollapsedWide = false;
+  state.sidebarDrawerOpen = false;
+  localStorage.setItem("devdeck.sidebarCollapsedWide", "0");
+  applySidebarUI();
+  return true;
+}
+
 function resetOutputWidth() {
   state.outputWidth = null;
   state.outputWidthPreset = null;
   localStorage.removeItem("devdeck.outputWidth");
   localStorage.removeItem("devdeck.outputWidthPreset");
+  restoreAutoCollapsedSidebarIfNeeded();
   applyActionLayout();
   applyOutputWidth();
 }
@@ -2359,6 +2388,11 @@ function setOutputWidthPreset(preset) {
   localStorage.setItem("devdeck.outputWidthPreset", preset);
   if (isOutputCollapsed()) {
     setOutputCollapsed(false, { persist: true });
+  }
+  if (preset === "max") {
+    autoCollapseSidebarForMaxOutput();
+  } else {
+    restoreAutoCollapsedSidebarIfNeeded();
   }
   if (ws) {
     const w = computePresetOutputWidth(preset, ws.clientWidth);
@@ -3612,6 +3646,7 @@ async function clearCategory(rawCat, scope = "project") {
 /* ---------- 事件繫結 ---------- */
 
 $("btn-sidebar-toggle").onclick = () => {
+  clearSidebarAutoCollapseFlag();
   if (isNarrow() || state.sidebarCollapsedWide) {
     state.sidebarDrawerOpen = !state.sidebarDrawerOpen;
   } else {
@@ -3622,6 +3657,7 @@ $("btn-sidebar-toggle").onclick = () => {
   applySidebarUI();
 };
 $("btn-sidebar-close").onclick = () => {
+  clearSidebarAutoCollapseFlag();
   if (isNarrow() || state.sidebarCollapsedWide) {
     state.sidebarDrawerOpen = false;
   } else {
@@ -3631,6 +3667,7 @@ $("btn-sidebar-close").onclick = () => {
   applySidebarUI();
 };
 $("btn-sidebar-pin").onclick = () => {
+  clearSidebarAutoCollapseFlag();
   state.sidebarCollapsedWide = false;
   localStorage.setItem("devdeck.sidebarCollapsedWide", "0");
   state.sidebarDrawerOpen = false;
@@ -3670,6 +3707,7 @@ $("output-head").onclick = () => {
     const w = Math.round(Math.min(Math.max(OUTPUT_MIN_WIDTH, rect.right - clientX), maxW));
     state.outputWidthPreset = null;
     localStorage.removeItem("devdeck.outputWidthPreset");
+    clearSidebarAutoCollapseFlag();
     state.outputWidth = w;
     yieldSplitIfOutputTooWide(w);
     ws.style.setProperty("--output-width", `${w}px`);
@@ -3712,6 +3750,7 @@ $("output-head").onclick = () => {
     const maxW = getMaxOutputWidth(ws.clientWidth);
     state.outputWidthPreset = null;
     localStorage.removeItem("devdeck.outputWidthPreset");
+    clearSidebarAutoCollapseFlag();
     state.outputWidth = Math.round(Math.min(Math.max(OUTPUT_MIN_WIDTH, cur + delta), maxW));
     localStorage.setItem("devdeck.outputWidth", String(state.outputWidth));
     yieldSplitIfOutputTooWide(state.outputWidth);
@@ -3762,6 +3801,7 @@ $("btn-toggle-split").onclick = () => {
   state.splitMode = nextSplit;
   localStorage.setItem("devdeck.actionSplit", nextSplit ? "1" : "0");
   if (nextSplit && !isOutputCollapsed()) {
+    restoreAutoCollapsedSidebarIfNeeded();
     const ws = $("main-workspace");
     if (ws) {
       const splitMaxW = getSplitMaxOutputWidth(ws.clientWidth);
