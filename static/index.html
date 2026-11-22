@@ -705,7 +705,7 @@
               <rect x="10.5" y="4" width="2.5" height="8" rx="0.6" fill="currentColor"/>
             </svg>
           </button>
-          <button type="button" id="btn-output-width-half" class="icon-btn output-width-btn" data-preset="half" aria-pressed="false" data-i18n-title="output.widthHalf" data-i18n-aria-label="output.widthHalf" title="右半邊（對齊畫面中央）" aria-label="右半邊（對齊畫面中央）">
+          <button type="button" id="btn-output-width-half" class="icon-btn output-width-btn" data-preset="half" aria-pressed="false" data-i18n-title="output.widthHalf" data-i18n-aria-label="output.widthHalf" title="並列最大寬度（保留雙欄並列空間）" aria-label="並列最大寬度（保留雙欄並列空間）">
             <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
               <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/>
               <rect x="8" y="4" width="5" height="8" rx="0.6" fill="currentColor"/>
@@ -715,6 +715,11 @@
             <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
               <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/>
               <rect x="4.5" y="4" width="8.5" height="8" rx="0.6" fill="currentColor"/>
+            </svg>
+          </button>
+          <button type="button" id="btn-output-width-reset" class="icon-btn output-width-btn" data-preset="reset" aria-pressed="false" data-i18n-title="output.widthReset" data-i18n-aria-label="output.widthReset" title="重設預設寬度" aria-label="重設預設寬度">
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+              <path fill="currentColor" d="M8 2.5a5.5 5.5 0 0 0-4.76 2.75H5.5v1.3H1.25V2.3h1.3v2.02A6.8 6.8 0 1 1 1.2 8h1.3A5.5 5.5 0 1 0 8 2.5z"/>
             </svg>
           </button>
         </div>
@@ -970,8 +975,9 @@ const I18N = {
     "output.resizeHint": "拖曳調整輸出寬度（雙擊重設）",
     "output.widthGroupLabel": "快速切換輸出面板寬度",
     "output.widthMin": "最小可用寬度",
-    "output.widthHalf": "右半邊（對齊畫面中央）",
+    "output.widthHalf": "並列最大寬度（保留雙欄並列空間）",
     "output.widthMax": "最大寬度",
+    "output.widthReset": "重設預設寬度",
     "common.cancel": "取消",
     "common.save": "儲存",
     "common.delete": "刪",
@@ -1195,8 +1201,9 @@ const I18N = {
     "output.resizeHint": "Drag to resize output width (double-click to reset)",
     "output.widthGroupLabel": "Quick output panel width presets",
     "output.widthMin": "Minimum width",
-    "output.widthHalf": "Right half (align to screen center)",
+    "output.widthHalf": "Max width for side-by-side view",
     "output.widthMax": "Maximum width",
+    "output.widthReset": "Reset to default width",
     "common.cancel": "Cancel",
     "common.save": "Save",
     "common.delete": "Del",
@@ -2230,10 +2237,7 @@ function getSplitMaxOutputWidth(wsWidth) {
 function computePresetOutputWidth(preset, wsWidth) {
   const maxW = getAbsMaxOutputWidth(wsWidth);
   if (preset === "min") return OUTPUT_MIN_WIDTH;
-  if (preset === "half") {
-    const viewportHalf = Math.round(window.innerWidth / 2);
-    return Math.round(Math.min(Math.max(OUTPUT_MIN_WIDTH, viewportHalf), maxW));
-  }
+  if (preset === "half") return Math.round(getSplitMaxOutputWidth(wsWidth));
   if (preset === "max") return Math.round(maxW);
   return null;
 }
@@ -2291,9 +2295,11 @@ function syncOutputWidthPresetButtons() {
     const preset = btn.dataset.preset;
     let isActive = false;
     if (!inactive) {
-      if (state.outputWidthPreset) {
+      if (preset === "reset") {
+        isActive = state.outputWidthPreset === null && state.outputWidth === null;
+      } else if (state.outputWidthPreset) {
         isActive = state.outputWidthPreset === preset;
-      } else if (curW != null && wsWidth > 0) {
+      } else if (state.outputWidth != null && curW != null && wsWidth > 0) {
         const target = computePresetOutputWidth(preset, wsWidth);
         if (target != null && Math.abs(curW - target) <= 2) isActive = true;
       }
@@ -2332,7 +2338,21 @@ function applyOutputWidth() {
   syncOutputWidthPresetButtons();
 }
 
+function resetOutputWidth() {
+  state.outputWidth = null;
+  state.outputWidthPreset = null;
+  localStorage.removeItem("devdeck.outputWidth");
+  localStorage.removeItem("devdeck.outputWidthPreset");
+  applyActionLayout();
+  applyOutputWidth();
+}
+
 function setOutputWidthPreset(preset) {
+  if (preset === "reset") {
+    if (isOutputCollapsed()) setOutputCollapsed(false, { persist: true });
+    resetOutputWidth();
+    return;
+  }
   if (!["min", "half", "max"].includes(preset)) return;
   const ws = $("main-workspace");
   state.outputWidthPreset = preset;
@@ -3682,14 +3702,7 @@ $("output-head").onclick = () => {
   };
   window.addEventListener("pointerup", endDrag);
   window.addEventListener("pointercancel", endDrag);
-  splitter.addEventListener("dblclick", () => {
-    state.outputWidth = null;
-    state.outputWidthPreset = null;
-    localStorage.removeItem("devdeck.outputWidth");
-    localStorage.removeItem("devdeck.outputWidthPreset");
-    applyActionLayout();
-    applyOutputWidth();
-  });
+  splitter.addEventListener("dblclick", resetOutputWidth);
   splitter.addEventListener("keydown", e => {
     if (isNarrow() || isOutputCollapsed()) return;
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
@@ -3758,8 +3771,8 @@ $("btn-toggle-split").onclick = () => {
         ? targetW
         : (curPanel ? Math.round(curPanel.getBoundingClientRect().width) : Math.round(ws.clientWidth * 0.42));
       if (effectiveW > splitMaxW) {
-        state.outputWidthPreset = null;
-        localStorage.removeItem("devdeck.outputWidthPreset");
+        state.outputWidthPreset = "half";
+        localStorage.setItem("devdeck.outputWidthPreset", "half");
         state.outputWidth = splitMaxW;
         localStorage.setItem("devdeck.outputWidth", String(splitMaxW));
       }
@@ -3986,7 +3999,7 @@ const HELP_CONTENT = {
         <li><strong>對「動作按鈕」按右鍵</strong>：執行、單次用外部終端機（一般／管理員）開啟、複製指令、複製腳本路徑、<strong>按鈕設定（重新編輯／刪除）</strong>、隱藏／顯示（通用按鈕）。</li>
         <li><strong>對「左側欄專案」按右鍵</strong>：開啟專案、<strong>專案設定（重新編輯／刪除／管理服務）</strong>、開啟外部終端機（一般／管理員）、開啟資料夾、複製目錄路徑。</li>
         <li><strong>對「分類標題」按右鍵</strong>：重新命名分類、合併至既有分類、移除分類（歸入未分類），或為「未分類」批次指定分類；面板右上角「分類排序」可拖曳調整分類順序。</li>
-        <li><strong>輸出面板調整</strong>：拖曳中間分隔線調整寬度，<strong>雙擊分隔線</strong>重設回預設寬度；亦可透過標題列按鈕快速切換「最小可用寬度／右半邊（對齊畫面中央）／最大寬度」，或收合／展開與清除輸出。</li>
+        <li><strong>輸出面板調整</strong>：拖曳中間分隔線調整寬度，<strong>雙擊分隔線</strong>重設回預設寬度；亦可透過標題列按鈕快速切換「最小可用寬度／並列最大寬度／最大寬度／重設預設寬度」，或收合／展開與清除輸出。</li>
         <li><strong>導覽列與右端選單（<code>⋮</code>）</strong>：點擊中央標題旁 <code>?</code> 可開啟使用說明；右上角 <code>⋮</code> 選單可<strong>切換介面語言（中文／英文）</strong>、開啟使用說明，或<strong>關閉</strong> devdeck 伺服器。</li>
       </ul>
     </section>
@@ -4070,7 +4083,7 @@ const HELP_CONTENT = {
         <li><strong>Right-click an "Action Button"</strong>: Run, run once in external terminal (standard / Admin), copy command, copy script path, <strong>Button settings (edit / delete)</strong>, or Hide / Show (global actions).</li>
         <li><strong>Right-click a "Sidebar Project"</strong>: Open project, <strong>Project settings (edit / delete / manage services)</strong>, open external terminal (standard / Admin), open folder, or copy directory path.</li>
         <li><strong>Right-click a "Category Header"</strong>: Rename category, merge into an existing category, remove category (move to Uncategorized), or batch-assign a category for "Uncategorized"; use "Reorder categories" in the top-right of the actions pane to drag and reorder categories.</li>
-        <li><strong>Output Panel Resizing</strong>: Drag the divider to resize width, or <strong>double-click the divider</strong> to reset to the default width; you can also use the header preset buttons for Minimum / Right half (screen center) / Maximum width, or collapse / expand / clear the output.</li>
+        <li><strong>Output Panel Resizing</strong>: Drag the divider to resize width, or <strong>double-click the divider</strong> to reset to the default width; you can also use the header preset buttons for Minimum / Max for side-by-side / Maximum / Reset default width, or collapse / expand / clear the output.</li>
         <li><strong>Header &amp; Top-Right Menu (<code>⋮</code>)</strong>: Click <code>?</code> next to the center title to open this guide; use the top-right <code>⋮</code> menu to <strong>switch language (中文 / English)</strong>, open the User Guide, or <strong>close</strong> the devdeck server.</li>
       </ul>
     </section>
