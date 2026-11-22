@@ -1,6 +1,0 @@
-{
-  "name": "path-probe",
-  "version": "1.0.0",
-  "description": "Isolated path probe",
-  "mcpServers": "./.codex.mcp.json"
-}
