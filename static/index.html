@@ -121,15 +121,29 @@
     flex: 1 1 0; min-width: 260px; min-height: 0;
     display: flex; flex-direction: column; overflow: hidden;
   }
+  #main-workspace.split-active #center-pane { min-width: 600px; }
   #project-bar {
-    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    display: flex; align-items: center; gap: 8px;
     padding: 10px 16px; border-bottom: 1px solid var(--border);
-    background: rgba(255,255,255,.02); flex: none;
+    background: rgba(255,255,255,.02); flex: none; min-width: 0;
+  }
+  .project-bar-main {
+    display: flex; align-items: center; gap: 4px; min-width: 0; flex: 0 1 auto;
   }
   #project-title {
-    margin: 0; font-size: 15px; font-weight: 600;
+    margin: 0 4px 0 0; font-size: 15px; font-weight: 600;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
   }
+  .project-icon-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 3px; flex: none;
+    background: transparent; border: 1px solid transparent; color: var(--muted);
+    padding: 5px 6px; border-radius: 6px; line-height: 1;
+  }
+  .project-icon-btn:hover, .project-icon-btn[aria-expanded="true"] {
+    color: var(--text); background: var(--hover); border-color: var(--border);
+  }
+  .project-icon-btn:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+  .project-dir-caret { opacity: .78; }
   #content { flex: 1; overflow-y: auto; padding: 16px; min-height: 0; }
   .empty { color: var(--muted); text-align: center; margin-top: 60px; }
 
@@ -321,7 +335,8 @@
     header { padding: 8px 12px; gap: 8px; }
     #btn-sidebar-toggle { max-width: 180px; }
     #main-workspace { flex-direction: column; }
-    #center-pane { min-width: 0; }
+    #center-pane,
+    #main-workspace.split-active #center-pane { min-width: 0; }
     #output-splitter { display: none !important; }
     #output-panel {
       width: 100% !important; height: min(38vh, 260px);
@@ -402,6 +417,53 @@
   .script-dir-field { display: flex; gap: 6px; margin-top: 4px; align-items: center; }
   .script-dir-field select { flex: 1 1 0; min-width: 0; margin-top: 0; }
   .script-dir-field .browse { flex: none; padding: 6px 10px; }
+
+  /* 共用浮動彈出選單與輕量 Toast */
+  .popup-menu {
+    position: fixed; z-index: 120;
+    min-width: 236px; max-width: min(360px, calc(100vw - 16px));
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 4px; box-shadow: 0 10px 28px rgba(0,0,0,.48);
+  }
+  .popup-menu-header {
+    font-family: Consolas, monospace; font-size: 12px; color: var(--muted);
+    padding: 6px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    user-select: text;
+  }
+  .popup-menu-sep { height: 1px; background: var(--border); margin: 4px 2px; }
+  .popup-menu-item {
+    display: flex; align-items: center; gap: 9px; width: 100%;
+    border: none; border-radius: 5px; background: transparent; color: var(--text);
+    padding: 7px 10px; font-size: 13px; text-align: left; cursor: pointer; line-height: 1.35;
+  }
+  .popup-menu-item:hover, .popup-menu-item:focus-visible {
+    background: rgba(79,140,255,.16); color: #fff; outline: none;
+  }
+  .popup-menu-item-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; flex: none; color: var(--muted);
+  }
+  .popup-menu-item:hover .popup-menu-item-icon,
+  .popup-menu-item:focus-visible .popup-menu-item-icon { color: var(--text); }
+  .popup-menu-item.is-admin .popup-menu-item-icon { color: var(--accent); }
+
+  #toast-container {
+    position: fixed; right: 16px; bottom: 16px; z-index: 200;
+    display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+    max-width: min(380px, calc(100vw - 32px));
+  }
+  .toast-item {
+    pointer-events: auto; background: var(--panel); color: var(--text);
+    border: 1px solid var(--border); border-left: 3px solid var(--accent);
+    border-radius: 8px; padding: 9px 14px; font-size: 13px; line-height: 1.45;
+    box-shadow: 0 8px 24px rgba(0,0,0,.42);
+    opacity: 0; transform: translateY(6px);
+    transition: opacity .16s ease, transform .16s ease;
+    overflow-wrap: anywhere;
+  }
+  .toast-item.show { opacity: 1; transform: translateY(0); }
+  .toast-item.success { border-left-color: var(--green); }
+  .toast-item.error { border-left-color: var(--red); }
 </style>
 </head>
 <body>
@@ -437,10 +499,18 @@
   <div id="main-workspace">
     <section id="center-pane">
       <div id="project-bar" hidden>
-        <h2 id="project-title"></h2>
+        <div class="project-bar-main">
+          <h2 id="project-title"></h2>
+          <button type="button" id="btn-edit-project" class="project-icon-btn" data-i18n-title="header.editProject" data-i18n-aria-label="header.editProject" title="專案設定" aria-label="專案設定">
+            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M6.5 1.5h3l.4 1.9a5.2 5.2 0 0 1 1.25.72l1.85-.62 1.5 2.6-1.45 1.3c.06.4.06.8 0 1.2l1.45 1.3-1.5 2.6-1.85-.62a5.2 5.2 0 0 1-1.25.72l-.4 1.9h-3l-.4-1.9a5.2 5.2 0 0 1-1.25-.72L3 12.5l-1.5-2.6 1.45-1.3a5.1 5.1 0 0 1 0-1.2L1.5 6.1 3 3.5l1.85.62c.39-.29.81-.53 1.25-.72l.4-1.9zM8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg>
+          </button>
+          <button type="button" id="btn-project-dir-menu" class="project-icon-btn" aria-haspopup="menu" aria-expanded="false" data-i18n-title="proj.dirMenuTitle" data-i18n-aria-label="proj.dirMenuTitle" title="專案目錄操作" aria-label="專案目錄操作">
+            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M1.75 2.5A1.25 1.25 0 0 0 .5 3.75v8.5c0 .69.56 1.25 1.25 1.25h12.5c.69 0 1.25-.56 1.25-1.25v-6.5c0-.69-.56-1.25-1.25-1.25H7.81l-1.2-1.5A1.25 1.25 0 0 0 5.63 2.5H1.75zm0 1.25h3.88l1.2 1.5c.24.3.6.47.98.47h6.44v6.53H1.75V3.75z"/></svg>
+            <svg class="project-dir-caret" viewBox="0 0 10 10" width="9" height="9" aria-hidden="true"><path fill="currentColor" d="M2 3.5L5 7l3-3.5H2z"/></svg>
+          </button>
+        </div>
         <span class="spacer"></span>
-        <div class="action-panel-controls" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <button type="button" id="btn-edit-project" data-i18n="header.editProject">編輯專案</button>
+        <div class="action-panel-controls" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:none;">
           <button type="button" id="btn-add-action" data-i18n="header.addAction">＋ 新增動作</button>
         </div>
       </div>
@@ -659,6 +729,9 @@
   </div>
 </dialog>
 
+<div id="popup-menu" class="popup-menu" role="menu" hidden></div>
+<div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
 <script>
 const $ = id => document.getElementById(id);
 
@@ -667,7 +740,7 @@ const DEFAULT_LANG = "zh-TW";
 const I18N = {
   "zh-TW": {
     "header.addProject": "＋ 新增專案",
-    "header.editProject": "編輯專案",
+    "header.editProject": "專案設定",
     "header.addAction": "＋ 新增動作",
     "header.addGlobalAction": "＋ 新增通用動作",
     "header.manageMode": "管理模式",
@@ -720,6 +793,13 @@ const I18N = {
     "proj.addSvc": "＋ 加入服務",
     "proj.del": "刪除專案",
     "proj.dragHint": "拖曳調整專案順序",
+    "proj.dirMenuTitle": "專案目錄操作",
+    "proj.openTerminal": "開啟外部終端機",
+    "proj.openTerminalAdmin": "開啟外部終端機（管理員）",
+    "proj.openExplorer": "開啟檔案總管",
+    "proj.openFinder": "在 Finder 中開啟",
+    "proj.openFolder": "開啟專案資料夾",
+    "proj.copyPath": "複製目錄路徑",
     "act.addTitle": "新增動作",
     "act.editTitle": "編輯動作",
     "act.addGlobalTitle": "新增通用動作",
@@ -758,7 +838,7 @@ const I18N = {
     "act.sort": "排序（數字小的在前）",
     "act.del": "刪除動作",
     "act.noScript": "（無可新增的腳本）",
-    "act.noServices": "此專案尚未設定服務（在「編輯專案」中加入）",
+    "act.noServices": "此專案尚未設定服務（在「專案設定」中加入）",
     "act.whenRunning": "運行中時停用",
     "act.whenStopped": "停止時停用",
     "empty.noProject": "還沒有專案，按「＋ 新增專案」開始。",
@@ -791,6 +871,8 @@ const I18N = {
     "toast.scriptReq": "請選擇腳本檔案",
     "toast.scriptAbsReq": "請輸入或選擇腳本絕對路徑",
     "toast.commandReq": "指令內容必填",
+    "toast.pathCopied": "已複製目錄路徑",
+    "toast.copyFailed": "無法複製目錄路徑",
     "confirm.delSvc": "刪除服務「{name}」？",
     "confirm.delProject": "刪除專案「{name}」及其所有動作設定？（不會動到專案檔案本身）",
     "confirm.delAction": "刪除動作「{label}」？",
@@ -822,6 +904,7 @@ const I18N = {
     "err.scriptNotFound": "腳本不存在：{path}",
     "err.scriptXorCommand": "腳本檔案與直接指令必須擇一填寫",
     "err.noExternalTerminal": "此平台找不到可啟動的外部終端機",
+    "err.noFileManager": "此平台找不到可開啟資料夾的檔案管理員",
     "err.adminRequiresTerminal": "「以管理員身分執行」僅支援外部終端機模式",
     "err.adminCancelled": "已取消管理員授權（UAC），未執行動作。",
     "err.invalidArguments": "附加指令參數格式錯誤：{detail}",
@@ -842,7 +925,7 @@ const I18N = {
   },
   "en": {
     "header.addProject": "+ Add project",
-    "header.editProject": "Edit project",
+    "header.editProject": "Project settings",
     "header.addAction": "+ Add action",
     "header.addGlobalAction": "+ Add global action",
     "header.manageMode": "Manage mode",
@@ -895,6 +978,13 @@ const I18N = {
     "proj.addSvc": "+ Add service",
     "proj.del": "Delete project",
     "proj.dragHint": "Drag to reorder project",
+    "proj.dirMenuTitle": "Project directory actions",
+    "proj.openTerminal": "Open external terminal",
+    "proj.openTerminalAdmin": "Open external terminal (Admin)",
+    "proj.openExplorer": "Open in File Explorer",
+    "proj.openFinder": "Open in Finder",
+    "proj.openFolder": "Open project folder",
+    "proj.copyPath": "Copy directory path",
     "act.addTitle": "Add action",
     "act.editTitle": "Edit action",
     "act.addGlobalTitle": "Add global action",
@@ -933,7 +1023,7 @@ const I18N = {
     "act.sort": "Sort order (smaller numbers first)",
     "act.del": "Delete action",
     "act.noScript": "(No scripts available to add)",
-    "act.noServices": 'This project has no services yet (add them in "Edit project").',
+    "act.noServices": 'This project has no services yet (add them in "Project settings").',
     "act.whenRunning": "Disable when running",
     "act.whenStopped": "Disable when stopped",
     "empty.noProject": 'No projects yet — click "+ Add project" to start.',
@@ -966,6 +1056,8 @@ const I18N = {
     "toast.scriptReq": "Please choose a script file",
     "toast.scriptAbsReq": "Please enter or pick an absolute script path",
     "toast.commandReq": "Command is required",
+    "toast.pathCopied": "Directory path copied",
+    "toast.copyFailed": "Failed to copy directory path",
     "confirm.delSvc": 'Delete service "{name}"?',
     "confirm.delProject": 'Delete project "{name}" and all its action settings? (Project files are left untouched.)',
     "confirm.delAction": 'Delete action "{label}"?',
@@ -997,6 +1089,7 @@ const I18N = {
     "err.scriptNotFound": "Script not found: {path}",
     "err.scriptXorCommand": "Fill in either a script file or a direct command, not both.",
     "err.noExternalTerminal": "No external terminal is available on this platform",
+    "err.noFileManager": "No file manager is available on this platform",
     "err.adminRequiresTerminal": '"Run as administrator" is only supported in external terminal mode',
     "err.adminCancelled": "Administrator authorization (UAC) was cancelled; action was not run.",
     "err.invalidArguments": "Invalid extra arguments: {detail}",
@@ -1054,6 +1147,7 @@ function renderOutputTitle() {
 
 // 切換語系：立即生效、記憶到 localStorage、同步 <html lang>，並重繪動態 render 的區塊
 function setLang(lang) {
+  closePopupMenu();
   LANG = I18N[lang] ? lang : DEFAULT_LANG;
   localStorage.setItem("devdeck.lang", LANG);
   document.documentElement.lang = LANG === "en" ? "en" : "zh-Hant";
@@ -1092,6 +1186,7 @@ const _savedOutW = Number(localStorage.getItem("devdeck.outputWidth"));
 const _savedTab = localStorage.getItem("devdeck.actionTab");
 const state = {
   projects: [], projectId: null, services: [], actions: [], globalActions: [], globalScriptDirs: [], scan: [],
+  platform: "",
   status: new Map(),  // service_id -> listening(bool)
   activeTab: _savedTab === "global" ? "global" : "project",
   splitMode: localStorage.getItem("devdeck.actionSplit") === "1",
@@ -1138,6 +1233,253 @@ async function api(method, url, body) {
 }
 const toast = msg => alert(msg);
 
+function showToast(msg, type = "info", duration = 2200) {
+  const box = $("toast-container");
+  if (!box) return;
+  const item = document.createElement("div");
+  item.className = `toast-item ${type}`;
+  item.textContent = msg;
+  box.appendChild(item);
+  requestAnimationFrame(() => item.classList.add("show"));
+  setTimeout(() => {
+    item.classList.remove("show");
+    setTimeout(() => item.remove(), 180);
+  }, duration);
+}
+
+function detectFallbackPlatform() {
+  const plat = (navigator.platform || "").toLowerCase();
+  if (plat.includes("win")) return "win32";
+  if (plat.includes("mac")) return "darwin";
+  return "linux";
+}
+
+async function loadSystemInfo() {
+  try {
+    const info = await api("GET", "/api/system-info");
+    state.platform = info?.platform || detectFallbackPlatform();
+  } catch {
+    state.platform = detectFallbackPlatform();
+  }
+}
+
+/* ---------- 共用浮動彈出選單與專案目錄操作 ---------- */
+
+let _popupMenuState = null;
+
+function isPopupMenuOpen() {
+  const menu = $("popup-menu");
+  return Boolean(menu && !menu.hidden);
+}
+
+function closePopupMenu({ restoreFocus = false } = {}) {
+  const menu = $("popup-menu");
+  if (!menu) return;
+  const prev = _popupMenuState;
+  _popupMenuState = null;
+  if (prev) {
+    document.removeEventListener("pointerdown", prev.onDocPointerDown, true);
+    document.removeEventListener("keydown", prev.onDocKeyDown, true);
+    window.removeEventListener("resize", prev.onCloseTrigger);
+    window.removeEventListener("scroll", prev.onScroll, true);
+    if (prev.anchorEl) prev.anchorEl.setAttribute("aria-expanded", "false");
+    if (prev.onClose) prev.onClose();
+    if (restoreFocus && prev.anchorEl && prev.anchorEl.isConnected) {
+      prev.anchorEl.focus();
+    }
+  }
+  menu.hidden = true;
+  menu.innerHTML = "";
+}
+
+function openPopupMenu({ anchorEl = null, point = null, headerText = "", items = [], onClose = null }) {
+  const menu = $("popup-menu");
+  if (!menu) return;
+  if (anchorEl && _popupMenuState && _popupMenuState.anchorEl === anchorEl && isPopupMenuOpen()) {
+    closePopupMenu();
+    return;
+  }
+  closePopupMenu();
+
+  menu.innerHTML = "";
+  if (headerText) {
+    const head = document.createElement("div");
+    head.className = "popup-menu-header";
+    head.textContent = headerText;
+    head.title = headerText;
+    menu.appendChild(head);
+    const sep = document.createElement("div");
+    sep.className = "popup-menu-sep";
+    sep.setAttribute("role", "separator");
+    menu.appendChild(sep);
+  }
+
+  for (const item of items) {
+    if (item.separator) {
+      const sep = document.createElement("div");
+      sep.className = "popup-menu-sep";
+      sep.setAttribute("role", "separator");
+      menu.appendChild(sep);
+      continue;
+    }
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "popup-menu-item" + (item.className ? ` ${item.className}` : "");
+    btn.setAttribute("role", "menuitem");
+    btn.innerHTML = `<span class="popup-menu-item-icon" aria-hidden="true">${item.iconSvg || ""}</span><span>${esc(item.label)}</span>`;
+    btn.onclick = () => {
+      closePopupMenu();
+      if (item.onClick) item.onClick();
+    };
+    menu.appendChild(btn);
+  }
+
+  menu.style.visibility = "hidden";
+  menu.hidden = false;
+  const menuW = menu.offsetWidth;
+  const menuH = menu.offsetHeight;
+  const margin = 8;
+  let left = margin;
+  let top = margin;
+
+  if (anchorEl) {
+    const rect = anchorEl.getBoundingClientRect();
+    left = rect.left;
+    top = rect.bottom + 4;
+    if (top + menuH > window.innerHeight - margin && rect.top - 4 - menuH >= margin) {
+      top = rect.top - 4 - menuH;
+    }
+    anchorEl.setAttribute("aria-expanded", "true");
+  } else if (point) {
+    left = point.x;
+    top = point.y;
+  }
+
+  left = Math.min(Math.max(margin, left), Math.max(margin, window.innerWidth - menuW - margin));
+  top = Math.min(Math.max(margin, top), Math.max(margin, window.innerHeight - menuH - margin));
+  menu.style.left = `${Math.round(left)}px`;
+  menu.style.top = `${Math.round(top)}px`;
+  menu.style.visibility = "";
+
+  const onDocPointerDown = e => {
+    if (menu.contains(e.target)) return;
+    if (anchorEl && anchorEl.contains(e.target)) return;
+    closePopupMenu();
+  };
+  const onDocKeyDown = e => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      closePopupMenu({ restoreFocus: true });
+      return;
+    }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      const btns = [...menu.querySelectorAll(".popup-menu-item")];
+      if (!btns.length) return;
+      e.preventDefault();
+      const idx = btns.indexOf(document.activeElement);
+      const next = e.key === "ArrowDown"
+        ? (idx + 1) % btns.length
+        : (idx <= 0 ? btns.length - 1 : idx - 1);
+      btns[next].focus();
+    }
+  };
+  const onCloseTrigger = () => closePopupMenu();
+  const onScroll = e => {
+    if (!menu.contains(e.target)) closePopupMenu();
+  };
+
+  _popupMenuState = {
+    anchorEl, onClose, onDocPointerDown, onDocKeyDown, onCloseTrigger, onScroll,
+  };
+  document.addEventListener("pointerdown", onDocPointerDown, true);
+  document.addEventListener("keydown", onDocKeyDown, true);
+  window.addEventListener("resize", onCloseTrigger);
+  window.addEventListener("scroll", onScroll, true);
+}
+
+function getFolderActionLabel() {
+  if (state.platform === "win32") return t("proj.openExplorer");
+  if (state.platform === "darwin") return t("proj.openFinder");
+  return t("proj.openFolder");
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {}
+  }
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.top = "-9999px";
+  ta.style.left = "-9999px";
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch {
+    ok = false;
+  }
+  ta.remove();
+  return ok;
+}
+
+async function openProjectTerminal(project, asAdmin = false) {
+  if (!project) return;
+  try {
+    await api("POST", `/api/projects/${project.id}/open-terminal`, { as_admin: Boolean(asAdmin) });
+  } catch (err) {
+    showToast(err.message, "error", 3800);
+  }
+}
+
+async function openProjectFolder(project) {
+  if (!project) return;
+  try {
+    await api("POST", `/api/projects/${project.id}/open-folder`);
+  } catch (err) {
+    showToast(err.message, "error", 3800);
+  }
+}
+
+async function copyProjectPath(project) {
+  if (!project?.path) return;
+  const ok = await copyTextToClipboard(project.path);
+  if (ok) showToast(t("toast.pathCopied"), "success", 2200);
+  else showToast(t("toast.copyFailed"), "error", 3000);
+}
+
+function buildProjectDirMenuItems(project) {
+  return [
+    {
+      iconSvg: `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M2 3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H2zm0 1h12v8H2V4zm1.8 1.7l-.7.8L5.3 8.5 3.1 10.5l.7.8L6.7 8.5 3.8 5.7zM7.5 10.3V11.3h4.3v-1H7.5z"/></svg>`,
+      label: t("proj.openTerminal"),
+      onClick: () => openProjectTerminal(project, false),
+    },
+    {
+      className: "is-admin",
+      iconSvg: `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M8 1.5L2.5 3.8v3.9c0 3.4 2.3 6.3 5.5 7.3 3.2-1 5.5-3.9 5.5-7.3V3.8L8 1.5zm0 1.4l4.1 1.7v3.1c0 2.7-1.7 5-4.1 5.9-2.4-.9-4.1-3.2-4.1-5.9V4.6L8 2.9zm0 1.7L5.3 7.4h1.9v3.7h1.6V7.4h1.9L8 4.6z"/></svg>`,
+      label: t("proj.openTerminalAdmin"),
+      onClick: () => openProjectTerminal(project, true),
+    },
+    {
+      iconSvg: `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M1.75 2.5A1.25 1.25 0 0 0 .5 3.75v8.5c0 .69.56 1.25 1.25 1.25h12.5c.69 0 1.25-.56 1.25-1.25v-6.5c0-.69-.56-1.25-1.25-1.25H7.81l-1.2-1.5A1.25 1.25 0 0 0 5.63 2.5H1.75zm0 1.25h3.88l1.2 1.5c.24.3.6.47.98.47h6.44v6.53H1.75V3.75z"/></svg>`,
+      label: getFolderActionLabel(),
+      onClick: () => openProjectFolder(project),
+    },
+    {
+      iconSvg: `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M10.5 1.5h-6A1.5 1.5 0 0 0 3 3v8.5h1.2V3a.3.3 0 0 1 .3-.3h6V1.5zm2 2.5h-6A1.5 1.5 0 0 0 5 5.5v8A1.5 1.5 0 0 0 6.5 15h6A1.5 1.5 0 0 0 14 13.5v-8A1.5 1.5 0 0 0 12.5 4zm.3 9.5a.3.3 0 0 1-.3.3h-6a.3.3 0 0 1-.3-.3v-8a.3.3 0 0 1 .3-.3h6a.3.3 0 0 1 .3.3v8z"/></svg>`,
+      label: t("proj.copyPath"),
+      onClick: () => copyProjectPath(project),
+    },
+  ];
+}
+
 /* ---------- 響應式佈局與側欄／輸出面板控制 ---------- */
 
 const narrowMQ = window.matchMedia("(max-width: 960px)");
@@ -1168,16 +1510,47 @@ function applySidebarUI() {
   toggleBtn.setAttribute("aria-expanded", String(overlay ? open : true));
 }
 
+const OUTPUT_MIN_WIDTH = 260;
+const SPLITTER_WIDTH = 6;
+const COLLAPSED_OUTPUT_WIDTH = 36;
+const CENTER_MIN_TABS = 280;
+const CENTER_MIN_SPLIT = 600;
+
+function canUseSplitLayout() {
+  if (isNarrow()) return false;
+  const ws = $("main-workspace");
+  if (!ws) return false;
+  const minOutputSpace = isOutputCollapsed()
+    ? COLLAPSED_OUTPUT_WIDTH
+    : (OUTPUT_MIN_WIDTH + SPLITTER_WIDTH);
+  return ws.clientWidth >= CENTER_MIN_SPLIT + minOutputSpace;
+}
+
+function getMaxOutputWidth(wsWidth, splitActive = state.effectiveSplit) {
+  const reserveCenter = splitActive
+    ? (CENTER_MIN_SPLIT + SPLITTER_WIDTH)
+    : CENTER_MIN_TABS;
+  return Math.max(OUTPUT_MIN_WIDTH, wsWidth - reserveCenter);
+}
+
 function applyOutputWidth() {
   const ws = $("main-workspace");
   if (!ws) return;
-  if (isNarrow() || isOutputCollapsed() || !(state.outputWidth > 0)) {
+  if (isNarrow() || isOutputCollapsed()) {
     ws.style.removeProperty("--output-width");
     return;
   }
-  const maxW = Math.max(260, ws.clientWidth - 280);
-  const clamped = Math.min(Math.max(260, state.outputWidth), maxW);
-  ws.style.setProperty("--output-width", `${clamped}px`);
+  const maxW = getMaxOutputWidth(ws.clientWidth, state.effectiveSplit);
+  if (state.outputWidth > 0) {
+    const clamped = Math.min(Math.max(OUTPUT_MIN_WIDTH, state.outputWidth), maxW);
+    ws.style.setProperty("--output-width", `${clamped}px`);
+    return;
+  }
+  if (state.effectiveSplit && Math.round(ws.clientWidth * 0.42) > maxW) {
+    ws.style.setProperty("--output-width", `${maxW}px`);
+  } else {
+    ws.style.removeProperty("--output-width");
+  }
 }
 
 function applyOutputUI() {
@@ -1228,6 +1601,7 @@ function renderProjectHeader() {
   if (bar && title) {
     bar.hidden = !p;
     title.textContent = p ? p.name : "";
+    title.title = p ? p.name : "";
   }
   renderActionTabs();
 }
@@ -1255,27 +1629,33 @@ function renderActionTabs() {
 }
 
 function applyActionLayout() {
+  const ws = $("main-workspace");
   const tabsBar = $("action-tabs-bar");
   const panes = $("action-panes");
   const paneProj = $("pane-project");
   const paneGlobal = $("pane-global");
   const splitBtn = $("btn-toggle-split");
   const addBtn = $("btn-add-action");
-  const content = $("content");
   if (!tabsBar || !panes) return;
 
   const hasProject = Boolean(state.projectId);
   tabsBar.hidden = !hasProject;
   panes.hidden = !hasProject;
-  if (!hasProject) return;
+  if (!hasProject) {
+    state.effectiveSplit = false;
+    if (ws) ws.classList.remove("split-active");
+    applyOutputWidth();
+    return;
+  }
 
-  const contentW = content ? content.clientWidth : 0;
-  const canSplit = !isNarrow() && contentW >= 560;
+  const canSplit = canUseSplitLayout();
   const effectiveSplit = state.splitMode && canSplit;
   state.effectiveSplit = effectiveSplit;
 
+  if (ws) ws.classList.toggle("split-active", effectiveSplit);
   tabsBar.classList.toggle("is-split", effectiveSplit);
   panes.classList.toggle("is-split", effectiveSplit);
+  applyOutputWidth();
 
   if (effectiveSplit) {
     paneProj.hidden = false;
@@ -1404,6 +1784,7 @@ function renderProjectList() {
 }
 
 async function selectProject(id) {
+  closePopupMenu();
   state.projectId = id;
   renderProjectHeader();
   renderProjectList();
@@ -2258,6 +2639,10 @@ $("sidebar-backdrop").onclick = () => {
   applySidebarUI();
 };
 document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && isPopupMenuOpen()) {
+    closePopupMenu({ restoreFocus: true });
+    return;
+  }
   if (e.key === "Escape" && state.sidebarDrawerOpen && !document.querySelector("dialog[open]")) {
     state.sidebarDrawerOpen = false;
     applySidebarUI();
@@ -2279,8 +2664,8 @@ $("output-head").onclick = () => {
 
   const setFromClientX = clientX => {
     const rect = ws.getBoundingClientRect();
-    const maxW = Math.max(260, rect.width - 280);
-    const w = Math.round(Math.min(Math.max(260, rect.right - clientX), maxW));
+    const maxW = getMaxOutputWidth(rect.width);
+    const w = Math.round(Math.min(Math.max(OUTPUT_MIN_WIDTH, rect.right - clientX), maxW));
     state.outputWidth = w;
     ws.style.setProperty("--output-width", `${w}px`);
   };
@@ -2321,8 +2706,8 @@ $("output-head").onclick = () => {
     e.preventDefault();
     const cur = $("output-panel").getBoundingClientRect().width;
     const delta = e.key === "ArrowLeft" ? 24 : -24;
-    const maxW = Math.max(260, ws.clientWidth - 280);
-    state.outputWidth = Math.round(Math.min(Math.max(260, cur + delta), maxW));
+    const maxW = getMaxOutputWidth(ws.clientWidth);
+    state.outputWidth = Math.round(Math.min(Math.max(OUTPUT_MIN_WIDTH, cur + delta), maxW));
     localStorage.setItem("devdeck.outputWidth", String(state.outputWidth));
     applyOutputWidth();
   });
@@ -2338,8 +2723,8 @@ window.addEventListener("resize", () => {
   applyOutputWidth();
   applyActionLayout();
 });
-if (typeof ResizeObserver !== "undefined" && $("content")) {
-  new ResizeObserver(() => applyActionLayout()).observe($("content"));
+if (typeof ResizeObserver !== "undefined" && $("main-workspace")) {
+  new ResizeObserver(() => applyActionLayout()).observe($("main-workspace"));
 }
 
 $("tab-project").onclick = () => {
@@ -2363,6 +2748,16 @@ $("btn-toggle-split").onclick = () => {
 
 $("btn-add-project").onclick = () => openProjectDialog(false);
 $("btn-edit-project").onclick = () => openProjectDialog(true);
+$("btn-project-dir-menu").onclick = e => {
+  e.stopPropagation();
+  const p = currentProject();
+  if (!p) return;
+  openPopupMenu({
+    anchorEl: $("btn-project-dir-menu"),
+    headerText: p.path,
+    items: buildProjectDirMenuItems(p),
+  });
+};
 $("btn-save-project").onclick = saveProject;
 $("btn-del-project").onclick = async () => {
   const p = currentProject();
@@ -2561,6 +2956,7 @@ wirePick("browse-a-workdir", "a-workdir", "pick.workdir", () => $("a-workdir").v
 setLang(detectLang());
 applySidebarUI();
 applyOutputUI();
+loadSystemInfo();
 loadProjects();
 startStatusPolling();
 </script>

@@ -246,6 +246,111 @@ def launch_external_terminal(
     raise RunError("err.noExternalTerminal")
 
 
+def _build_win_shell_command(
+    cwd: str, env: dict | None = None, inject_venv: bool = False
+) -> str:
+    """組合 Windows 開啟互動式外部終端機的 PowerShell 指令。"""
+    parts: list[str] = []
+    if inject_venv and env and env.get("VIRTUAL_ENV"):
+        venv_dir = env["VIRTUAL_ENV"]
+        venv_bin = str(Path(venv_dir) / "Scripts")
+        parts.append(f"$env:VIRTUAL_ENV = {_powershell_literal(venv_dir)}")
+        parts.append(f"$env:PATH = {_powershell_literal(venv_bin)} + ';' + $env:PATH")
+    parts.append(f"Set-Location -LiteralPath {_powershell_literal(cwd)}")
+    return "; ".join(parts)
+
+
+def open_external_terminal(
+    cwd: str, env: dict | None = None, run_as_admin: bool = False
+) -> None:
+    """以指定工作目錄開啟互動式外部終端機。"""
+    try:
+        if sys.platform == "win32":
+            shell = shutil.which("pwsh") or shutil.which("powershell")
+            if not shell:
+                raise RunError("err.noPwsh")
+            if run_as_admin:
+                ps_script = _build_win_shell_command(cwd, env, inject_venv=True)
+                encoded = _encode_powershell_command(ps_script)
+                _shell_execute_runas(shell, f"-NoExit -EncodedCommand {encoded}", cwd)
+                return
+            ps_script = _build_win_shell_command(cwd)
+            subprocess.Popen(
+                [shell, "-NoExit", "-Command", ps_script],
+                cwd=cwd,
+                env=env,
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
+            )
+            return
+        if sys.platform == "darwin":
+            exports = (
+                [
+                    f"export {key}={shlex.quote(env[key])}"
+                    for key in ("PATH", "VIRTUAL_ENV")
+                    if env.get(key)
+                ]
+                if env
+                else []
+            )
+            if run_as_admin:
+                env_pairs = (
+                    [
+                        f"{key}={env[key]}"
+                        for key in ("PATH", "VIRTUAL_ENV")
+                        if env.get(key)
+                    ]
+                    if env
+                    else []
+                )
+                login_shell = os.environ.get("SHELL") or "/bin/zsh"
+                sudo_cmd = (
+                    ["sudo", "--", "env", *env_pairs, login_shell]
+                    if env_pairs
+                    else ["sudo", "-s"]
+                )
+                command = f"cd {shlex.quote(cwd)} && {shlex.join(sudo_cmd)}"
+            else:
+                command = f"cd {shlex.quote(cwd)}"
+            if exports:
+                command = "; ".join(exports + [command])
+            subprocess.Popen(
+                [
+                    "osascript",
+                    "-e",
+                    'tell application "Terminal"',
+                    "-e",
+                    "activate",
+                    "-e",
+                    f"do script {json.dumps(command)}",
+                    "-e",
+                    "end tell",
+                ],
+                cwd=cwd,
+                env=env,
+            )
+            return
+    except OSError as e:
+        raise RunError("err.spawnFailed", detail=str(e)) from e
+    raise RunError("err.noExternalTerminal")
+
+
+def open_folder(path: str) -> None:
+    """以系統預設檔案管理員開啟指定資料夾。"""
+    try:
+        if sys.platform == "win32":
+            os.startfile(path)
+            return
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", path])
+            return
+        opener = shutil.which("xdg-open")
+        if not opener:
+            raise RunError("err.noFileManager")
+        subprocess.Popen([opener, path])
+    except OSError as e:
+        raise RunError("err.spawnFailed", detail=str(e)) from e
+
+
 async def stream_run(cmd: list[str], cwd: str, env: dict | None = None):
     """執行命令，逐行 yield ("line", text)，結束時 yield ("done", exit_code)。"""
     try:

@@ -207,6 +207,10 @@ class ProjectReorderIn(BaseModel):
     project_ids: list[int]
 
 
+class OpenTerminalIn(BaseModel):
+    as_admin: bool = False
+
+
 # ---------- helpers ----------
 
 def get_project(project_id: int) -> dict:
@@ -275,6 +279,35 @@ def delete_project(project_id: int):
     get_project(project_id)
     with db.get_conn() as conn:
         conn.execute("DELETE FROM projects WHERE id=?", (project_id,))
+    return {"ok": True}
+
+
+@app.post("/api/projects/{project_id}/open-terminal")
+async def open_project_terminal(
+    project_id: int, body: OpenTerminalIn = Body(default_factory=OpenTerminalIn)
+):
+    project = get_project(project_id)
+    project_path = project["path"]
+    if not Path(project_path).is_dir():
+        raise HTTPException(400, detail={"key": "err.projectPathMissing", "params": {"path": project_path}})
+    env = runner.venv_env(project)
+    try:
+        await asyncio.to_thread(runner.open_external_terminal, project_path, env, body.as_admin)
+    except runner.RunError as e:
+        raise HTTPException(400, detail={"key": e.key, "params": e.params})
+    return {"ok": True}
+
+
+@app.post("/api/projects/{project_id}/open-folder")
+async def open_project_folder(project_id: int):
+    project = get_project(project_id)
+    project_path = project["path"]
+    if not Path(project_path).is_dir():
+        raise HTTPException(400, detail={"key": "err.projectPathMissing", "params": {"path": project_path}})
+    try:
+        await asyncio.to_thread(runner.open_folder, project_path)
+    except runner.RunError as e:
+        raise HTTPException(400, detail={"key": e.key, "params": e.params})
     return {"ok": True}
 
 
@@ -909,7 +942,12 @@ async def pick_file(body: PickFileIn):
     )
 
 
-# ---------- health ----------
+# ---------- health & system info ----------
+
+@app.get("/api/system-info")
+def system_info():
+    return {"platform": sys.platform}
+
 
 @app.get("/health")
 def health():
