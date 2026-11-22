@@ -27,7 +27,26 @@ def _venv_python(project) -> Path:
     return venv / "bin" / "python"
 
 
-def resolve_command(script_path: Path, project) -> list[str]:
+def resolve_workdir(workdir: str | None, project_path: str) -> str:
+    """解析工作目錄：留空回傳專案路徑；相對路徑解析為 project_path / workdir。"""
+    cleaned = (workdir or "").strip()
+    if not cleaned:
+        return project_path
+    p = Path(cleaned)
+    if p.is_absolute():
+        return str(p)
+    return str(Path(project_path) / p)
+
+
+def _system_python() -> str | None:
+    if sys.platform == "win32":
+        return shutil.which("python") or shutil.which("python3")
+    return shutil.which("python3") or shutil.which("python")
+
+
+def resolve_command(
+    script_path: Path, project, *, allow_system_python: bool = False
+) -> list[str]:
     ext = script_path.suffix.lower()
     if ext == ".ps1":
         shell = shutil.which("pwsh") or shutil.which("powershell")
@@ -36,9 +55,14 @@ def resolve_command(script_path: Path, project) -> list[str]:
         return [shell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script_path)]
     if ext == ".py":
         python = _venv_python(project)
-        if not python.exists():
-            raise RunError("err.noVenvPython", python=str(python))
-        return [str(python), str(script_path)]
+        if python.exists():
+            return [str(python), str(script_path)]
+        if allow_system_python:
+            sys_python = _system_python()
+            if sys_python:
+                return [sys_python, str(script_path)]
+            raise RunError("err.noPython")
+        raise RunError("err.noVenvPython", python=str(python))
     if ext in (".mjs", ".js"):
         node = shutil.which("node")
         if not node:

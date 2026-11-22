@@ -24,20 +24,26 @@ CREATE TABLE IF NOT EXISTS services (
     pid_file   TEXT,
     url        TEXT                -- 選填：有值時狀態列顯示「開啟」連結
 );
+CREATE TABLE IF NOT EXISTS global_script_dirs (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    path       TEXT NOT NULL UNIQUE,
+    sort_order INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS actions (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    project_id  INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    script_file TEXT,               -- 與 command 二選一：腳本目錄內的檔名
-    command     TEXT,               -- 與 script_file 二選一：直接執行的指令
-    arguments   TEXT,               -- 腳本檔案的固定附加參數（以 shell 風格引號分隔）
-    execution_mode TEXT NOT NULL DEFAULT 'panel' CHECK (execution_mode IN ('panel', 'terminal')),
-    run_as_admin   INTEGER NOT NULL DEFAULT 0, -- 是否以管理員身分執行（0/1，僅限外部終端機）
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id         INTEGER REFERENCES projects(id) ON DELETE CASCADE, -- NULL 代表跨專案通用按鈕
+    script_dir_id      INTEGER REFERENCES global_script_dirs(id) ON DELETE SET NULL,
+    script_file        TEXT,               -- 與 command 二選一：檔名或絕對路徑
+    command            TEXT,               -- 與 script_file 二選一：直接執行的指令
+    arguments          TEXT,               -- 腳本檔案的固定附加參數（以 shell 風格引號分隔）
+    execution_mode     TEXT NOT NULL DEFAULT 'panel' CHECK (execution_mode IN ('panel', 'terminal')),
+    run_as_admin       INTEGER NOT NULL DEFAULT 0, -- 是否以管理員身分執行（0/1，僅限外部終端機）
     confirm_before_run INTEGER NOT NULL DEFAULT 0, -- 執行前是否顯示確認對話框（0/1）
     confirm_message    TEXT,        -- 自訂確認訊息（NULL 時前端依語系顯示預設訊息）
-    label       TEXT NOT NULL,
-    workdir     TEXT,
-    category    TEXT,
-    sort_order  INTEGER NOT NULL DEFAULT 0
+    label              TEXT NOT NULL,
+    workdir            TEXT,
+    category           TEXT,
+    sort_order         INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS action_services (
     action_id    INTEGER NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
@@ -45,6 +51,39 @@ CREATE TABLE IF NOT EXISTS action_services (
     disable_when TEXT NOT NULL CHECK (disable_when IN ('running', 'stopped')),
     PRIMARY KEY (action_id, service_id)
 );
+CREATE TABLE IF NOT EXISTS project_hidden_actions (
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    action_id  INTEGER NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
+    PRIMARY KEY (project_id, action_id)
+);
+"""
+
+MIGRATE_GLOBAL_ACTIONS = """
+ALTER TABLE actions RENAME TO actions_old;
+CREATE TABLE actions (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id         INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+    script_dir_id      INTEGER REFERENCES global_script_dirs(id) ON DELETE SET NULL,
+    script_file        TEXT,
+    command            TEXT,
+    arguments          TEXT,
+    execution_mode     TEXT NOT NULL DEFAULT 'panel' CHECK (execution_mode IN ('panel', 'terminal')),
+    run_as_admin       INTEGER NOT NULL DEFAULT 0,
+    confirm_before_run INTEGER NOT NULL DEFAULT 0,
+    confirm_message    TEXT,
+    label              TEXT NOT NULL,
+    workdir            TEXT,
+    category           TEXT,
+    sort_order         INTEGER NOT NULL DEFAULT 0
+);
+INSERT INTO actions (id, project_id, script_dir_id, script_file, command, arguments,
+                     execution_mode, run_as_admin, confirm_before_run, confirm_message,
+                     label, workdir, category, sort_order)
+    SELECT id, project_id, NULL, script_file, command, arguments,
+           execution_mode, run_as_admin, confirm_before_run, confirm_message,
+           label, workdir, category, sort_order
+    FROM actions_old;
+DROP TABLE actions_old;
 """
 
 MIGRATE_ADD_COMMAND = """
@@ -153,6 +192,24 @@ def _migrate():
             if "run_as_admin" not in cols:
                 conn.execute("ALTER TABLE actions ADD COLUMN run_as_admin INTEGER NOT NULL DEFAULT 0")
                 conn.commit()
+            # v9 → v10：actions.project_id 改為 nullable（支援通用按鈕）並加入 script_dir_id
+            action_info = conn.execute("PRAGMA table_info(actions)").fetchall()
+            cols = {r[1] for r in action_info}
+            proj_id_notnull = next((r[3] for r in action_info if r[1] == "project_id"), 0)
+            if proj_id_notnull == 1 or "script_dir_id" not in cols:
+                conn.execute(
+                    "CREATE TABLE IF NOT EXISTS global_script_dirs ("
+                    " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                    " path TEXT NOT NULL UNIQUE,"
+                    " sort_order INTEGER NOT NULL DEFAULT 0)"
+                )
+                conn.execute("PRAGMA legacy_alter_table = ON")
+                try:
+                    conn.executescript(MIGRATE_GLOBAL_ACTIONS)
+                    conn.commit()
+                finally:
+                    conn.execute("PRAGMA legacy_alter_table = OFF")
+                    conn.commit()
         # v6 → v7：projects 新增 sort_order 欄位（依既有 name 順序填入 10, 20, ...，避免升級後順序跳動）
         if proj_cols and "sort_order" not in proj_cols:
             conn.execute("ALTER TABLE projects ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")

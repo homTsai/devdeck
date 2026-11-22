@@ -215,8 +215,63 @@
     display: flex; flex-direction: column; border-left: 1px solid var(--border);
   }
   .action .mgmt button { border: none; border-radius: 0; padding: 2px 8px; flex: 1; font-size: 12px; }
+  .action .mgmt button + button { border-top: 1px solid var(--border); }
+  .action.is-hidden-action { opacity: .48; border-style: dashed; }
+  .action .hidden-pill {
+    display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px;
+    font-size: 11px; color: var(--muted); border: 1px solid var(--border);
+    background: rgba(255, 255, 255, .04);
+  }
   .broken { opacity: .5; }
   .broken .run { text-decoration: line-through; }
+
+  /* 按鈕面板分頁與並列模式 */
+  #action-tabs-bar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-bottom: 14px; border-bottom: 1px solid var(--border); padding-bottom: 8px;
+  }
+  .action-tabs { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
+  .action-tab {
+    background: transparent; border: 1px solid transparent; color: var(--muted);
+    padding: 5px 12px; border-radius: 6px; font-size: 13px; font-weight: 500;
+    max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .action-tab:hover { color: var(--text); background: var(--hover); border-color: var(--border); }
+  .action-tab.active {
+    background: rgba(79,140,255,.16); border-color: var(--accent); color: #fff;
+  }
+  #action-tabs-bar.is-split .action-tab { cursor: default; }
+  #action-tabs-bar.is-split .action-tab.active {
+    background: transparent; border-color: transparent; color: var(--muted);
+  }
+  .split-toggle {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 12px; padding: 4px 10px; color: var(--muted); background: var(--panel);
+  }
+  .split-toggle.active {
+    background: rgba(79,140,255,.16); border-color: var(--accent); color: #fff;
+  }
+  .split-toggle:disabled { opacity: .4; cursor: not-allowed; }
+  #action-panes { display: block; }
+  #action-panes.is-split {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px; align-items: start;
+  }
+  .action-pane { min-width: 0; }
+  #action-panes.is-split #pane-global {
+    border-left: 1px solid var(--border); padding-left: 16px;
+  }
+  .pane-head {
+    display: none; align-items: center; gap: 8px;
+    margin: 0 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border);
+  }
+  #action-panes.is-split .pane-head { display: flex; }
+  .pane-title {
+    margin: 0; font-size: 13px; font-weight: 600; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1;
+  }
+  .pane-add { font-size: 12px; padding: 3px 9px; flex: none; }
+  .action-pane .empty { margin-top: 28px; }
 
   /* 輸出面板與可拖曳分隔線 */
   #output-splitter {
@@ -339,6 +394,14 @@
   .path-field input { flex: 1 1 0; min-width: 0; margin-top: 0; }
   .path-field .browse { flex: none; padding: 6px 10px; white-space: nowrap; }
   .path-field .browse:disabled { opacity: .5; cursor: progress; }
+  .global-notice {
+    margin: 0 0 12px; padding: 8px 12px; border-radius: 6px;
+    background: rgba(79,140,255,.12); border: 1px solid rgba(79,140,255,.35);
+    color: var(--text); font-size: 13px; line-height: 1.45;
+  }
+  .script-dir-field { display: flex; gap: 6px; margin-top: 4px; align-items: center; }
+  .script-dir-field select { flex: 1 1 0; min-width: 0; margin-top: 0; }
+  .script-dir-field .browse { flex: none; padding: 6px 10px; }
 </style>
 </head>
 <body>
@@ -376,12 +439,39 @@
       <div id="project-bar" hidden>
         <h2 id="project-title"></h2>
         <span class="spacer"></span>
-        <button type="button" id="btn-edit-project" data-i18n="header.editProject">編輯專案</button>
-        <button type="button" id="btn-add-action" data-i18n="header.addAction">＋ 新增動作</button>
+        <div class="action-panel-controls" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <button type="button" id="btn-edit-project" data-i18n="header.editProject">編輯專案</button>
+          <button type="button" id="btn-add-action" data-i18n="header.addAction">＋ 新增動作</button>
+        </div>
       </div>
       <div id="content">
         <div id="services"></div>
-        <div id="action-list"></div>
+        <div id="action-tabs-bar" hidden>
+          <div class="action-tabs" role="tablist">
+            <button type="button" id="tab-project" class="action-tab active" role="tab" aria-selected="true"></button>
+            <button type="button" id="tab-global" class="action-tab" role="tab" aria-selected="false" data-i18n="tabs.global">通用</button>
+          </div>
+          <span class="spacer"></span>
+          <button type="button" id="btn-toggle-split" class="split-toggle" aria-pressed="false"></button>
+        </div>
+        <div id="action-panes" hidden>
+          <section id="pane-project" class="action-pane" data-scope="project">
+            <div class="pane-head">
+              <h3 id="pane-project-title" class="pane-title"></h3>
+              <button type="button" class="pane-add" id="btn-add-project-action" data-i18n="tabs.addShort">＋ 新增</button>
+            </div>
+            <div id="action-list-project" class="action-list"></div>
+            <div id="empty-project" class="empty" hidden></div>
+          </section>
+          <section id="pane-global" class="action-pane" data-scope="global" hidden>
+            <div class="pane-head">
+              <h3 id="pane-global-title" class="pane-title" data-i18n="tabs.global">通用</h3>
+              <button type="button" class="pane-add" id="btn-add-global-action" data-i18n="tabs.addShort">＋ 新增</button>
+            </div>
+            <div id="action-list-global" class="action-list"></div>
+            <div id="empty-global" class="empty" hidden></div>
+          </section>
+        </div>
         <div id="empty" class="empty" hidden></div>
       </div>
     </section>
@@ -441,6 +531,7 @@
 <!-- 動作 dialog -->
 <dialog id="action-dialog">
   <h3 id="action-dialog-title">新增動作</h3>
+  <p id="a-global-notice" class="global-notice" hidden data-i18n="global.notice">編輯的是跨專案通用按鈕，將套用至所有專案（執行時使用當下選中專案的目錄與 venv）。</p>
   <div class="action-form-grid">
     <section class="action-form-column">
       <h4 data-i18n="act.actionInfo">動作資訊</h4>
@@ -452,14 +543,28 @@
       <label><span data-i18n="act.displayName">顯示名稱</span> <input id="a-label" required></label>
       <label><span data-i18n="act.category">分類（選填）</span><input id="a-category" list="category-list"><datalist id="category-list"></datalist></label>
       <label><span data-i18n="act.sort">排序（數字小的在前）</span><input id="a-sort" type="number" value="0"></label>
-      <fieldset>
+      <fieldset id="a-services-fieldset">
         <legend data-i18n="act.svcLegend">按鈕狀態關聯（勾選的條件「全部成立」時停用此按鈕）</legend>
         <div id="a-services"></div>
       </fieldset>
     </section>
     <section class="action-form-column">
       <h4 data-i18n="act.runInfo">執行設定</h4>
+      <label id="a-script-dir-row" hidden>
+        <span data-i18n="act.scriptDir">腳本目錄</span>
+        <span class="script-dir-field">
+          <select id="a-script-dir"></select>
+          <button type="button" id="btn-remove-script-dir" class="danger browse" hidden data-i18n-title="act.removeScriptDirTitle" title="從清單移除此腳本目錄">✕</button>
+        </span>
+      </label>
       <label id="a-script-row"><span data-i18n="act.scriptRow">腳本檔案</span> <select id="a-script"></select></label>
+      <label id="a-script-abs-row" hidden>
+        <span data-i18n="act.scriptAbsRow">腳本絕對路徑</span>
+        <span class="path-field">
+          <input id="a-script-abs" placeholder="C:\scripts\tool.ps1">
+          <button type="button" class="browse" id="browse-a-script-abs" data-i18n="common.browse">瀏覽…</button>
+        </span>
+      </label>
       <label id="a-arguments-row"><span data-i18n="act.arguments">附加指令參數（選填；含空白的參數請以雙引號包住）</span>
         <input id="a-arguments" placeholder="--port 8000 --name &quot;My App&quot;"></label>
       <label id="a-command-row" hidden><span data-i18n="act.commandRow">指令內容（於工作目錄以 shell 執行，專案 venv 已掛入 PATH）</span>
@@ -564,7 +669,17 @@ const I18N = {
     "header.addProject": "＋ 新增專案",
     "header.editProject": "編輯專案",
     "header.addAction": "＋ 新增動作",
+    "header.addGlobalAction": "＋ 新增通用動作",
     "header.manageMode": "管理模式",
+    "tabs.global": "通用",
+    "tabs.splitEnable": "並列顯示",
+    "tabs.splitDisable": "分頁顯示",
+    "tabs.splitUnavailable": "面板寬度不足時自動暫時切換為分頁顯示",
+    "tabs.addShort": "＋ 新增",
+    "global.notice": "編輯的是跨專案通用按鈕，將套用至所有專案（執行時使用當下選中專案的目錄與 venv）。",
+    "global.hide": "隱藏",
+    "global.show": "顯示",
+    "global.hiddenBadge": "已隱藏",
     "header.shutdown": "關閉工具",
     "header.shutdownTitle": "停止 devdeck 伺服器",
     "sidebar.projects": "專案",
@@ -588,6 +703,8 @@ const I18N = {
     "pick.scriptsDir": "選擇腳本資料夾",
     "pick.venvDir": "選擇 venv 資料夾",
     "pick.workdir": "選擇工作目錄",
+    "pick.globalScriptDir": "選擇通用腳本目錄",
+    "pick.scriptFile": "選擇腳本檔案",
     "proj.addTitle": "新增專案",
     "proj.editTitle": "編輯專案",
     "proj.name": "專案名稱",
@@ -605,11 +722,19 @@ const I18N = {
     "proj.dragHint": "拖曳調整專案順序",
     "act.addTitle": "新增動作",
     "act.editTitle": "編輯動作",
+    "act.addGlobalTitle": "新增通用動作",
+    "act.editGlobalTitle": "編輯通用動作",
     "act.typeLabel": "動作類型：",
     "act.typeScript": "腳本檔案",
     "act.typeCommand": "直接指令",
     "act.actionInfo": "動作資訊",
     "act.runInfo": "執行設定",
+    "act.scriptDir": "腳本目錄",
+    "act.scriptDirAbs": "絕對路徑",
+    "act.scriptDirAdd": "＋ 新增目錄…",
+    "act.scriptDirMissingSuffix": "（目錄不存在）",
+    "act.scriptAbsRow": "腳本絕對路徑",
+    "act.removeScriptDirTitle": "從清單移除此腳本目錄",
     "act.scriptRow": "腳本檔案",
     "act.arguments": "附加指令參數（選填；含空白的參數請以雙引號包住）",
     "act.commandRow": "指令內容（於工作目錄以 shell 執行，專案 venv 已掛入 PATH）",
@@ -639,6 +764,8 @@ const I18N = {
     "empty.noProject": "還沒有專案，按「＋ 新增專案」開始。",
     "empty.noProjectOption": "（尚無專案）",
     "empty.noAction": "此專案還沒有動作，按「＋ 新增動作」從腳本目錄挑選。",
+    "empty.noGlobalAction": "還沒有通用按鈕，按「＋ 新增通用動作」建立跨專案共用指令或腳本。",
+    "empty.allGlobalHidden": "此專案已隱藏所有通用按鈕；開啟「管理模式」可重新顯示。",
     "cat.uncategorized": "未分類",
     "cat.dragHint": "拖曳調整分類順序",
     "cat.editHint": "編輯分類名稱",
@@ -662,10 +789,13 @@ const I18N = {
     "toast.nameReq": "名稱與路徑必填",
     "toast.labelReq": "顯示名稱必填",
     "toast.scriptReq": "請選擇腳本檔案",
+    "toast.scriptAbsReq": "請輸入或選擇腳本絕對路徑",
     "toast.commandReq": "指令內容必填",
     "confirm.delSvc": "刪除服務「{name}」？",
     "confirm.delProject": "刪除專案「{name}」及其所有動作設定？（不會動到專案檔案本身）",
     "confirm.delAction": "刪除動作「{label}」？",
+    "confirm.delGlobalAction": "刪除通用按鈕「{label}」？所有專案都將移除此按鈕。",
+    "confirm.removeScriptDir": "從通用腳本目錄清單移除「{path}」？既有使用此目錄的通用按鈕將自動轉為絕對路徑保留。",
     "confirm.clearCategory": "確定要移除分類「{name}」嗎？其下的 {count} 個動作將歸入「未分類」。",
     "confirm.mergeCategory": "分類「{to}」已存在，確定要將「{from}」下的 {count} 個動作合併到「{to}」後方嗎？",
     "confirm.shutdown": "關閉 devdeck 伺服器？（不影響已啟動的專案服務）",
@@ -683,6 +813,7 @@ const I18N = {
     "auth.lostHint": "Token missing or invalid — launch devdeck from its shortcut/launcher again.",
     /* 錯誤訊息（後端回 error key + 參數，前端依語系組訊息）*/
     "err.noPwsh": "找不到 pwsh / powershell——請安裝 PowerShell（macOS 需另裝 pwsh）並確認已在 PATH 上；解法詳見 README「疑難排解」。",
+    "err.noPython": "找不到 python——此專案未設定 .venv，且系統 PATH 上也沒有 python / python3。",
     "err.noVenvPython": "找不到專案 venv 的 python：{python}——請確認專案設定的 venv 路徑正確，或先在專案目錄建立 venv；解法詳見 README「疑難排解」。",
     "err.noNode": "找不到 node——請安裝 Node.js 並確認 node 已在 PATH 上；macOS 從 Finder 啟動時 PATH 較精簡，解法詳見 README「疑難排解」。",
     "err.noBash": "找不到 bash——請安裝 bash（Windows 可用 Git Bash）並確認已在 PATH 上；解法詳見 README「疑難排解」。",
@@ -701,12 +832,29 @@ const I18N = {
     "err.actionNotFound": "找不到動作",
     "err.pickerUnavailable": "無法開啟資料夾選擇視窗——此環境可能缺少 tkinter（Linux 請安裝 python3-tk）。你仍可手動輸入路徑。",
     "err.pickerFailed": "開啟資料夾選擇視窗失敗：{detail}",
+    "err.filePickerUnavailable": "無法開啟檔案選擇視窗——此環境可能缺少 tkinter（Linux 請安裝 python3-tk）。你仍可手動輸入路徑。",
+    "err.filePickerFailed": "開啟檔案選擇視窗失敗：{detail}",
+    "err.scriptDirNotFound": "找不到指定的通用腳本目錄",
+    "err.scriptPathMustBeAbsolute": "未選擇腳本目錄時，腳本檔案必須為絕對路徑",
+    "err.projectRequiredForGlobal": "執行通用按鈕時必須指定目標專案",
+    "err.notGlobalAction": "只有跨專案通用按鈕可以設定專案隱藏狀態",
+    "err.workdirMissing": "工作目錄不存在：{path}",
   },
   "en": {
     "header.addProject": "+ Add project",
     "header.editProject": "Edit project",
     "header.addAction": "+ Add action",
+    "header.addGlobalAction": "+ Add global action",
     "header.manageMode": "Manage mode",
+    "tabs.global": "Global",
+    "tabs.splitEnable": "Side-by-side",
+    "tabs.splitDisable": "Tabs view",
+    "tabs.splitUnavailable": "Panel too narrow for side-by-side view; showing tabs",
+    "tabs.addShort": "+ Add",
+    "global.notice": "Editing a cross-project global button. Changes apply to all projects (runs in the active project's directory and venv).",
+    "global.hide": "Hide",
+    "global.show": "Show",
+    "global.hiddenBadge": "Hidden",
     "header.shutdown": "Shut down",
     "header.shutdownTitle": "Stop the devdeck server",
     "sidebar.projects": "Projects",
@@ -730,6 +878,8 @@ const I18N = {
     "pick.scriptsDir": "Select scripts folder",
     "pick.venvDir": "Select venv folder",
     "pick.workdir": "Select working directory",
+    "pick.globalScriptDir": "Select global scripts folder",
+    "pick.scriptFile": "Select script file",
     "proj.addTitle": "Add project",
     "proj.editTitle": "Edit project",
     "proj.name": "Project name",
@@ -747,11 +897,19 @@ const I18N = {
     "proj.dragHint": "Drag to reorder project",
     "act.addTitle": "Add action",
     "act.editTitle": "Edit action",
+    "act.addGlobalTitle": "Add global action",
+    "act.editGlobalTitle": "Edit global action",
     "act.typeLabel": "Action type:",
     "act.typeScript": "Script file",
     "act.typeCommand": "Direct command",
     "act.actionInfo": "Action details",
     "act.runInfo": "Run settings",
+    "act.scriptDir": "Script folder",
+    "act.scriptDirAbs": "Absolute path",
+    "act.scriptDirAdd": "+ Add folder…",
+    "act.scriptDirMissingSuffix": " (missing)",
+    "act.scriptAbsRow": "Script absolute path",
+    "act.removeScriptDirTitle": "Remove this script folder from the list",
     "act.scriptRow": "Script file",
     "act.arguments": "Extra arguments (optional; quote arguments containing spaces)",
     "act.commandRow": "Command (runs in the working directory via shell; the project venv is on PATH)",
@@ -781,6 +939,8 @@ const I18N = {
     "empty.noProject": 'No projects yet — click "+ Add project" to start.',
     "empty.noProjectOption": "(No projects yet)",
     "empty.noAction": 'No actions yet — click "+ Add action" to pick from the scripts folder.',
+    "empty.noGlobalAction": 'No global actions yet — click "+ Add global action" to create a shared command or script.',
+    "empty.allGlobalHidden": 'All global actions are hidden for this project. Turn on "Manage mode" to unhide.',
     "cat.uncategorized": "Uncategorized",
     "cat.dragHint": "Drag to reorder category",
     "cat.editHint": "Edit category name",
@@ -804,10 +964,13 @@ const I18N = {
     "toast.nameReq": "Name and path are required",
     "toast.labelReq": "Display name is required",
     "toast.scriptReq": "Please choose a script file",
+    "toast.scriptAbsReq": "Please enter or pick an absolute script path",
     "toast.commandReq": "Command is required",
     "confirm.delSvc": 'Delete service "{name}"?',
     "confirm.delProject": 'Delete project "{name}" and all its action settings? (Project files are left untouched.)',
     "confirm.delAction": 'Delete action "{label}"?',
+    "confirm.delGlobalAction": 'Delete global action "{label}"? It will be removed from all projects.',
+    "confirm.removeScriptDir": 'Remove "{path}" from global script folders? Existing global actions using it will be converted to absolute paths.',
     "confirm.clearCategory": 'Remove category "{name}"? Its {count} action(s) will be moved to "Uncategorized".',
     "confirm.mergeCategory": 'Category "{to}" already exists. Merge {count} action(s) from "{from}" after "{to}"?',
     "confirm.shutdown": "Shut down the devdeck server? (Running project services are unaffected.)",
@@ -825,6 +988,7 @@ const I18N = {
     "auth.lostHint": "Token missing or invalid — launch devdeck from its shortcut/launcher again.",
     /* 錯誤訊息（後端回 error key + 參數，前端依語系組訊息）*/
     "err.noPwsh": "Cannot find pwsh / powershell — install PowerShell (on macOS install pwsh separately) and make sure it's on PATH; see the Troubleshooting section in the README.",
+    "err.noPython": "Cannot find python — this project has no .venv, and no python / python3 was found on PATH.",
     "err.noVenvPython": "Cannot find the project venv's python: {python} — check the project's configured venv path, or create a venv in the project folder first; see the Troubleshooting section in the README.",
     "err.noNode": "Cannot find node — install Node.js and make sure node is on PATH; on macOS the PATH is leaner when launched from Finder — see the Troubleshooting section in the README.",
     "err.noBash": "Cannot find bash — install bash (on Windows use Git Bash) and make sure it's on PATH; see the Troubleshooting section in the README.",
@@ -843,6 +1007,13 @@ const I18N = {
     "err.actionNotFound": "Action not found",
     "err.pickerUnavailable": "Could not open the folder picker — tkinter may be missing (on Linux install python3-tk). You can still type the path manually.",
     "err.pickerFailed": "Failed to open the folder picker: {detail}",
+    "err.filePickerUnavailable": "Could not open the file picker — tkinter may be missing (on Linux install python3-tk). You can still type the path manually.",
+    "err.filePickerFailed": "Failed to open the file picker: {detail}",
+    "err.scriptDirNotFound": "Global script folder not found",
+    "err.scriptPathMustBeAbsolute": "Script path must be absolute when no script folder is selected",
+    "err.projectRequiredForGlobal": "An active project is required to run a global action",
+    "err.notGlobalAction": "Only global actions can have per-project visibility",
+    "err.workdirMissing": "Working directory does not exist: {path}",
   },
 };
 let LANG = DEFAULT_LANG;
@@ -895,6 +1066,8 @@ function setLang(lang) {
   applySidebarUI();
   applyOutputUI();
   syncAdminField();
+  renderActionTabs();
+  applyActionLayout();
   if (state.projectId) { renderActions(); refreshStatus(); }
   else { $("empty").textContent = t("empty.noProject"); }
 }
@@ -916,10 +1089,17 @@ function authLost() {
     <small>${t("auth.lostHint")}</small></div>`;
 }
 const _savedOutW = Number(localStorage.getItem("devdeck.outputWidth"));
+const _savedTab = localStorage.getItem("devdeck.actionTab");
 const state = {
-  projects: [], projectId: null, services: [], actions: [], scan: [],
+  projects: [], projectId: null, services: [], actions: [], globalActions: [], globalScriptDirs: [], scan: [],
   status: new Map(),  // service_id -> listening(bool)
-  editingActionId: null, editingCategory: null, editingProject: false, statusTimer: null, runAbort: null,
+  activeTab: _savedTab === "global" ? "global" : "project",
+  splitMode: localStorage.getItem("devdeck.actionSplit") === "1",
+  effectiveSplit: false,
+  editingActionId: null, editingActionScope: "project",
+  editingCategory: null, editingCategoryScope: "project",
+  lastScriptDirSelection: "__abs__",
+  editingProject: false, statusTimer: null, runAbort: null,
   outputLabel: null, outputProjectName: null,  // 目前輸出面板顯示的動作與來源專案名稱
   sidebarCollapsedWide: localStorage.getItem("devdeck.sidebarCollapsedWide") === "1",
   sidebarDrawerOpen: false,
@@ -929,6 +1109,10 @@ const state = {
   },
   outputWidth: Number.isFinite(_savedOutW) && _savedOutW >= 260 ? _savedOutW : null,
 };
+
+function findActionById(id) {
+  return state.actions.find(a => a.id === id) || state.globalActions.find(a => a.id === id) || null;
+}
 
 async function api(method, url, body) {
   const res = await fetch(url, {
@@ -1010,6 +1194,7 @@ function applyOutputUI() {
   btn.title = t(collapsed ? "output.expand" : "output.collapse");
   btn.setAttribute("aria-expanded", String(!collapsed));
   applyOutputWidth();
+  applyActionLayout();
 }
 
 function setOutputCollapsed(collapsed, { persist = true } = {}) {
@@ -1044,6 +1229,74 @@ function renderProjectHeader() {
     bar.hidden = !p;
     title.textContent = p ? p.name : "";
   }
+  renderActionTabs();
+}
+
+function renderActionTabs() {
+  const p = currentProject();
+  const tabProj = $("tab-project");
+  const paneProjTitle = $("pane-project-title");
+  const tabGlobal = $("tab-global");
+  if (tabProj) {
+    tabProj.textContent = p ? p.name : "";
+    tabProj.title = p ? p.name : "";
+    tabProj.classList.toggle("active", state.activeTab === "project");
+    tabProj.setAttribute("aria-selected", String(state.activeTab === "project"));
+  }
+  if (paneProjTitle) {
+    paneProjTitle.textContent = p ? p.name : "";
+    paneProjTitle.title = p ? p.name : "";
+  }
+  if (tabGlobal) {
+    tabGlobal.textContent = t("tabs.global");
+    tabGlobal.classList.toggle("active", state.activeTab === "global");
+    tabGlobal.setAttribute("aria-selected", String(state.activeTab === "global"));
+  }
+}
+
+function applyActionLayout() {
+  const tabsBar = $("action-tabs-bar");
+  const panes = $("action-panes");
+  const paneProj = $("pane-project");
+  const paneGlobal = $("pane-global");
+  const splitBtn = $("btn-toggle-split");
+  const addBtn = $("btn-add-action");
+  const content = $("content");
+  if (!tabsBar || !panes) return;
+
+  const hasProject = Boolean(state.projectId);
+  tabsBar.hidden = !hasProject;
+  panes.hidden = !hasProject;
+  if (!hasProject) return;
+
+  const contentW = content ? content.clientWidth : 0;
+  const canSplit = !isNarrow() && contentW >= 560;
+  const effectiveSplit = state.splitMode && canSplit;
+  state.effectiveSplit = effectiveSplit;
+
+  tabsBar.classList.toggle("is-split", effectiveSplit);
+  panes.classList.toggle("is-split", effectiveSplit);
+
+  if (effectiveSplit) {
+    paneProj.hidden = false;
+    paneGlobal.hidden = false;
+  } else {
+    paneProj.hidden = state.activeTab !== "project";
+    paneGlobal.hidden = state.activeTab !== "global";
+  }
+
+  if (splitBtn) {
+    splitBtn.disabled = !canSplit;
+    splitBtn.classList.toggle("active", effectiveSplit);
+    splitBtn.setAttribute("aria-pressed", String(effectiveSplit));
+    splitBtn.textContent = t(effectiveSplit ? "tabs.splitDisable" : "tabs.splitEnable");
+    splitBtn.title = canSplit ? "" : t("tabs.splitUnavailable");
+  }
+  if (addBtn) {
+    addBtn.hidden = effectiveSplit;
+    addBtn.textContent = t(state.activeTab === "global" ? "header.addGlobalAction" : "header.addAction");
+  }
+  renderActionTabs();
 }
 
 function renderProjectList() {
@@ -1154,16 +1407,21 @@ async function selectProject(id) {
   state.projectId = id;
   renderProjectHeader();
   renderProjectList();
+  applyActionLayout();
   if (!id) {
-    $("services").innerHTML = ""; $("action-list").innerHTML = "";
+    $("services").innerHTML = "";
+    $("action-list-project").innerHTML = "";
+    $("action-list-global").innerHTML = "";
     $("empty").hidden = false;
     $("empty").textContent = t("empty.noProject");
     return;
   }
+  $("empty").hidden = true;
   localStorage.setItem("devdeck.project", id);
-  [state.services, state.actions] = await Promise.all([
+  [state.services, state.actions, state.globalActions] = await Promise.all([
     api("GET", `/api/projects/${id}/services`),
     api("GET", `/api/projects/${id}/actions`),
+    api("GET", `/api/global-actions?project_id=${id}`),
   ]);
   renderActions();
   refreshStatus();
@@ -1227,33 +1485,46 @@ function esc(s) {
 }
 
 function formatActionCommand(a) {
-  return a.script_file
-    ? a.script_file + (a.arguments ? " " + a.arguments : "")
-    : "$ " + (a.command || "");
+  if (a.script_file) {
+    const scriptText = a.resolved_script_path || a.script_file;
+    return scriptText + (a.arguments ? " " + a.arguments : "");
+  }
+  return "$ " + (a.command || "");
 }
 
 function normCategory(cat) {
   return (cat && cat.trim()) ? cat.trim() : "";
 }
 
-function renderActions() {
-  const box = $("action-list");
+function renderActionPane(scope, actions, box, emptyEl) {
   box.innerHTML = "";
-  $("empty").hidden = state.actions.length > 0;
-  if (!state.actions.length) {
-    $("empty").textContent = t("empty.noAction");
+  const managing = document.body.classList.contains("manage");
+  const visibleActions = scope === "global" && !managing
+    ? actions.filter(a => !a.hidden)
+    : actions;
+
+  emptyEl.hidden = visibleActions.length > 0;
+  if (!visibleActions.length) {
+    if (scope === "global") {
+      emptyEl.textContent = actions.length > 0 ? t("empty.allGlobalHidden") : t("empty.noGlobalAction");
+    } else {
+      emptyEl.textContent = t("empty.noAction");
+    }
     return;
   }
+
   const groups = new Map();
-  for (const a of state.actions) {
+  for (const a of visibleActions) {
     const rawCat = normCategory(a.category);
     if (!groups.has(rawCat)) groups.set(rawCat, []);
     groups.get(rawCat).push(a);
   }
+
   for (const [rawCat, items] of groups) {
     const div = document.createElement("div");
     div.className = "category";
     div.dataset.category = rawCat;
+    div.dataset.scope = scope;
 
     const displayCat = rawCat || t("cat.uncategorized");
     div.innerHTML = `
@@ -1270,7 +1541,8 @@ function renderActions() {
     row.className = "actions";
     for (const a of items) {
       const card = document.createElement("div");
-      card.className = "action";
+      const isHidden = scope === "global" && Boolean(a.hidden);
+      card.className = "action" + (isHidden ? " is-hidden-action" : "");
       const cmdText = formatActionCommand(a);
       const adminTitle = t("act.adminBadgeTitle");
       const confirmTitle = t("act.confirmBadgeTitle");
@@ -1284,10 +1556,14 @@ function renderActions() {
       const confirmBadge = a.confirm_before_run
         ? `<span class="confirm-badge" title="${esc(confirmTitle)}" aria-label="${esc(confirmTitle)}"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M8 1.5L2.5 3.8v3.9c0 3.4 2.3 6.3 5.5 7.3 3.2-1 5.5-3.9 5.5-7.3V3.8L8 1.5zm0 1.4l4.1 1.7v3.1c0 2.7-1.7 5-4.1 5.9-2.4-.9-4.1-3.2-4.1-5.9V4.6L8 2.9zm-.7 2.4v3.4h1.4V5.3H7.3zm0 4.4v1.4h1.4V9.7H7.3z"/></svg></span>`
         : "";
+      const hiddenBadge = isHidden ? `<span class="hidden-pill">${esc(t("global.hiddenBadge"))}</span>` : "";
+      const hideBtn = scope === "global"
+        ? `<button class="toggle-hide" data-id="${a.id}" data-hidden="${isHidden ? "1" : "0"}">${esc(t(isHidden ? "global.show" : "global.hide"))}</button>`
+        : "";
       card.innerHTML = `
-        <button class="run" data-id="${a.id}" title="${esc(btnTitle)}"><span class="run-label">${esc(a.label)}</span>${adminBadge}${confirmBadge}</button>
+        <button class="run" data-id="${a.id}" title="${esc(btnTitle)}"><span class="run-label">${esc(a.label)}</span>${adminBadge}${confirmBadge}${hiddenBadge}</button>
         <span class="mgmt">
-          <button class="edit" data-id="${a.id}">${t("common.edit")}</button>
+          ${hideBtn}<button class="edit" data-id="${a.id}" data-scope="${scope}">${t("common.edit")}</button>
         </span>`;
       row.appendChild(card);
     }
@@ -1300,6 +1576,7 @@ function renderActions() {
         return;
       }
       window._draggedCategory = div;
+      window._draggedCategoryScope = scope;
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", rawCat);
       try {
@@ -1312,16 +1589,17 @@ function renderActions() {
     header.ondragend = () => {
       div.classList.remove("dragging");
       window._draggedCategory = null;
+      window._draggedCategoryScope = null;
       document.querySelectorAll(".category").forEach(c => {
         c.classList.remove("drag-over-top", "drag-over-bottom");
       });
     };
     div.ondragenter = e => {
-      if (!document.body.classList.contains("manage") || !window._draggedCategory) return;
+      if (!document.body.classList.contains("manage") || !window._draggedCategory || window._draggedCategoryScope !== scope) return;
       e.preventDefault();
     };
     div.ondragover = e => {
-      if (!document.body.classList.contains("manage") || !window._draggedCategory) return;
+      if (!document.body.classList.contains("manage") || !window._draggedCategory || window._draggedCategoryScope !== scope) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
       if (window._draggedCategory === div) return;
@@ -1342,7 +1620,7 @@ function renderActions() {
       }
     };
     div.ondrop = async e => {
-      if (!document.body.classList.contains("manage") || !window._draggedCategory) return;
+      if (!document.body.classList.contains("manage") || !window._draggedCategory || window._draggedCategoryScope !== scope) return;
       e.preventDefault();
       const dragged = window._draggedCategory;
       div.classList.remove("drag-over-top", "drag-over-bottom");
@@ -1358,8 +1636,13 @@ function renderActions() {
 
       const categories = [...box.querySelectorAll(".category")].map(el => el.dataset.category || null);
       try {
-        await api("POST", `/api/projects/${state.projectId}/categories/reorder`, { categories });
-        state.actions = await api("GET", `/api/projects/${state.projectId}/actions`);
+        if (scope === "global") {
+          await api("POST", "/api/global-actions/categories/reorder", { categories });
+          state.globalActions = await api("GET", `/api/global-actions?project_id=${state.projectId}`);
+        } else {
+          await api("POST", `/api/projects/${state.projectId}/categories/reorder`, { categories });
+          state.actions = await api("GET", `/api/projects/${state.projectId}/actions`);
+        }
       } catch (err) {
         toast(err.message);
         await selectProject(state.projectId);
@@ -1368,7 +1651,13 @@ function renderActions() {
 
     box.appendChild(div);
   }
+}
+
+function renderActions() {
+  renderActionPane("project", state.actions, $("action-list-project"), $("empty-project"));
+  renderActionPane("global", state.globalActions, $("action-list-global"), $("empty-global"));
   applyButtonStates();
+  applyActionLayout();
 }
 
 /* ---------- 執行（SSE）---------- */
@@ -1433,8 +1722,9 @@ function confirmRunAction(action) {
       : "act.executionPanel"
   );
   const workdir = action.workdir && action.workdir.trim();
-  $("confirm-run-workdir-row").hidden = !workdir;
-  $("confirm-run-workdir").textContent = workdir || "";
+  const displayWorkdir = workdir || (action.is_global ? (currentProject()?.path || "") : "");
+  $("confirm-run-workdir-row").hidden = !displayWorkdir;
+  $("confirm-run-workdir").textContent = displayWorkdir;
 
   return new Promise(resolve => {
     _confirmRunResolve = resolve;
@@ -1446,12 +1736,12 @@ function confirmRunAction(action) {
 async function runAction(id, btn) {
   // 用 fetch POST 讀 SSE（不用 EventSource：它只能 GET，而 GET 端點擋不住跨站觸發）
   if (btn.disabled) return;
-  let action = state.actions.find(a => a.id === id);
+  let action = findActionById(id);
   if (action?.confirm_before_run) {
     const ok = await confirmRunAction(action);
     if (!ok) return;
     const freshBtn = document.querySelector(`button.run[data-id="${id}"]`);
-    const freshAction = state.actions.find(a => a.id === id);
+    const freshAction = findActionById(id);
     if (!freshAction || !freshBtn || freshBtn.disabled) return;
     btn = freshBtn;
     action = freshAction;
@@ -1471,7 +1761,7 @@ async function runAction(id, btn) {
     const res = await fetch(`/api/actions/${id}/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Devdeck-Token": TOKEN() },
-      body: "{}", signal: ctrl.signal,
+      body: JSON.stringify({ project_id: state.projectId }), signal: ctrl.signal,
     });
     if (res.status === 401) { authLost(); return; }
     if (!res.ok) {
@@ -1580,56 +1870,153 @@ async function saveProject() {
 
 /* ---------- 動作 dialog ---------- */
 
-async function openActionDialog(actionId) {
-  state.editingActionId = actionId;
-  const a = actionId ? state.actions.find(x => x.id === actionId) : null;
-  $("action-dialog-title").textContent = t(a ? "act.editTitle" : "act.addTitle");
-  try { state.scan = await api("GET", `/api/projects/${state.projectId}/scan`); }
-  catch { state.scan = []; }  // 掃描失敗（如腳本目錄不存在）仍可新增「直接指令」
-
+function populateScriptSelect(items, currentValue) {
   const sel = $("a-script");
   sel.innerHTML = "";
-  for (const s of state.scan) {
+  for (const s of items) {
     const opt = document.createElement("option");
-    opt.value = s.file; opt.textContent = s.file;
+    opt.value = s.file;
+    opt.textContent = s.file;
+    sel.appendChild(opt);
+  }
+  if (currentValue && !items.some(s => s.file === currentValue)) {
+    const opt = document.createElement("option");
+    opt.value = currentValue;
+    opt.textContent = currentValue;
     sel.appendChild(opt);
   }
   if (!sel.options.length) {
     const opt = document.createElement("option");
-    opt.value = ""; opt.textContent = t("act.noScript");
+    opt.value = "";
+    opt.textContent = t("act.noScript");
     sel.appendChild(opt);
   }
+  sel.value = currentValue && [...sel.options].some(o => o.value === currentValue)
+    ? currentValue
+    : sel.options[0].value;
+}
 
-  const box = $("a-services");
-  box.innerHTML = state.services.length
-    ? "" : `<small style="color:var(--muted)">${t("act.noServices")}</small>`;
-  for (const s of state.services) {
-    const link = a?.services?.find(x => x.service_id === s.id);
-    const running = state.status.get(s.id);
-    const row = document.createElement("label");
-    row.style.cssText = "display:flex;align-items:center;gap:8px;margin:6px 0";
-    row.innerHTML = `
-      <input type="checkbox" class="l-check" data-id="${s.id}" ${link ? "checked" : ""}>
-      <span class="light ${running === true ? "on" : running === false ? "off" : ""}"></span>
-      <span style="min-width:110px;color:var(--text)">${esc(s.name)} (:${s.port})</span>
-      <select class="l-when">
-        <option value="running">${t("act.whenRunning")}</option>
-        <option value="stopped">${t("act.whenStopped")}</option>
-      </select>`;
-    row.querySelector(".l-when").value = link?.disable_when || "running";
-    box.appendChild(row);
+function renderScriptDirSelect(selectedVal) {
+  const dirSel = $("a-script-dir");
+  dirSel.innerHTML = "";
+
+  const absOpt = document.createElement("option");
+  absOpt.value = "__abs__";
+  absOpt.textContent = t("act.scriptDirAbs");
+  dirSel.appendChild(absOpt);
+
+  if (state.globalScriptDirs.length) {
+    const sep1 = document.createElement("option");
+    sep1.disabled = true;
+    sep1.textContent = "──────────────";
+    dirSel.appendChild(sep1);
+
+    for (const d of state.globalScriptDirs) {
+      const opt = document.createElement("option");
+      opt.value = `dir:${d.id}`;
+      opt.textContent = d.exists ? d.path : `${d.path}${t("act.scriptDirMissingSuffix")}`;
+      dirSel.appendChild(opt);
+    }
+  }
+
+  const sep2 = document.createElement("option");
+  sep2.disabled = true;
+  sep2.textContent = "──────────────";
+  dirSel.appendChild(sep2);
+
+  const addOpt = document.createElement("option");
+  addOpt.value = "__add__";
+  addOpt.textContent = t("act.scriptDirAdd");
+  dirSel.appendChild(addOpt);
+
+  const valid = [...dirSel.options].some(o => !o.disabled && o.value === selectedVal && o.value !== "__add__");
+  dirSel.value = valid ? selectedVal : "__abs__";
+  state.lastScriptDirSelection = dirSel.value;
+}
+
+async function syncGlobalScriptDirUI(keepScriptFile = null) {
+  const dirSel = $("a-script-dir");
+  const val = dirSel.value;
+  const isAbs = val === "__abs__";
+  const dirId = val.startsWith("dir:") ? Number(val.slice(4)) : null;
+
+  $("btn-remove-script-dir").hidden = isAbs || !dirId;
+  const type = document.querySelector('input[name="a-type"]:checked').value;
+  $("a-script-row").hidden = type !== "script" || isAbs;
+  $("a-script-abs-row").hidden = type !== "script" || !isAbs;
+
+  if (dirId) {
+    try {
+      state.scan = await api("GET", `/api/global-script-dirs/${dirId}/scan`);
+    } catch {
+      state.scan = [];
+    }
+    populateScriptSelect(state.scan, keepScriptFile);
+  }
+}
+
+async function openActionDialog(actionId, scope = null) {
+  state.editingActionId = actionId;
+  const a = actionId ? findActionById(actionId) : null;
+  const resolvedScope = a ? (a.is_global ? "global" : "project") : (scope || state.activeTab || "project");
+  state.editingActionScope = resolvedScope;
+  const isGlobal = resolvedScope === "global";
+
+  $("action-dialog-title").textContent = t(
+    isGlobal
+      ? (a ? "act.editGlobalTitle" : "act.addGlobalTitle")
+      : (a ? "act.editTitle" : "act.addTitle")
+  );
+  $("a-global-notice").hidden = !isGlobal;
+  $("a-services-fieldset").hidden = isGlobal;
+
+  if (isGlobal) {
+    try {
+      state.globalScriptDirs = await api("GET", "/api/global-script-dirs");
+    } catch {
+      state.globalScriptDirs = [];
+    }
+    const initDirVal = a?.script_dir_id ? `dir:${a.script_dir_id}` : "__abs__";
+    renderScriptDirSelect(initDirVal);
+    $("a-script-abs").value = !a?.script_dir_id && a?.script_file ? a.script_file : "";
+    await syncGlobalScriptDirUI(a?.script_dir_id ? a.script_file : null);
+  } else {
+    try { state.scan = await api("GET", `/api/projects/${state.projectId}/scan`); }
+    catch { state.scan = []; }  // 掃描失敗（如腳本目錄不存在）仍可新增「直接指令」
+    populateScriptSelect(state.scan, a?.script_file || null);
+
+    const box = $("a-services");
+    box.innerHTML = state.services.length
+      ? "" : `<small style="color:var(--muted)">${t("act.noServices")}</small>`;
+    for (const s of state.services) {
+      const link = a?.services?.find(x => x.service_id === s.id);
+      const running = state.status.get(s.id);
+      const row = document.createElement("label");
+      row.style.cssText = "display:flex;align-items:center;gap:8px;margin:6px 0";
+      row.innerHTML = `
+        <input type="checkbox" class="l-check" data-id="${s.id}" ${link ? "checked" : ""}>
+        <span class="light ${running === true ? "on" : running === false ? "off" : ""}"></span>
+        <span style="min-width:110px;color:var(--text)">${esc(s.name)} (:${s.port})</span>
+        <select class="l-when">
+          <option value="running">${t("act.whenRunning")}</option>
+          <option value="stopped">${t("act.whenStopped")}</option>
+        </select>`;
+      row.querySelector(".l-when").value = link?.disable_when || "running";
+      box.appendChild(row);
+    }
   }
 
   const dl = $("category-list");
   dl.innerHTML = "";
-  for (const c of new Set(state.actions.map(x => x.category).filter(Boolean))) {
+  const catSource = isGlobal ? state.globalActions : state.actions;
+  for (const c of new Set(catSource.map(x => x.category).filter(Boolean))) {
     const opt = document.createElement("option");
     opt.value = c;
     dl.appendChild(opt);
   }
 
-  sel.value = a?.script_file || sel.options[0].value;
-  setActionType(a?.command ? "command" : "script");
+  const defaultType = a ? (a.command ? "command" : "script") : (isGlobal ? "command" : "script");
+  setActionType(defaultType);
   $("a-command").value = a?.command || "";
   $("a-arguments").value = a?.arguments || "";
   const mode = a?.execution_mode || "panel";
@@ -1664,11 +2051,22 @@ document.querySelectorAll('input[name="a-execution-mode"]').forEach(r => {
   r.onchange = syncAdminField;
 });
 
-function setActionType(t) {
-  document.querySelector(`input[name="a-type"][value="${t}"]`).checked = true;
-  $("a-script-row").hidden = t !== "script";
-  $("a-arguments-row").hidden = t !== "script";
-  $("a-command-row").hidden = t !== "command";
+function setActionType(type) {
+  document.querySelector(`input[name="a-type"][value="${type}"]`).checked = true;
+  const isGlobal = state.editingActionScope === "global";
+  const isScript = type === "script";
+  $("a-script-dir-row").hidden = !isGlobal || !isScript;
+  if (isGlobal) {
+    const isAbs = $("a-script-dir").value === "__abs__";
+    $("a-script-row").hidden = !isScript || isAbs;
+    $("a-script-abs-row").hidden = !isScript || !isAbs;
+    $("btn-remove-script-dir").hidden = isAbs || !$("a-script-dir").value.startsWith("dir:");
+  } else {
+    $("a-script-row").hidden = !isScript;
+    $("a-script-abs-row").hidden = true;
+  }
+  $("a-arguments-row").hidden = !isScript;
+  $("a-command-row").hidden = type !== "command";
 }
 document.querySelectorAll('input[name="a-type"]').forEach(r => {
   r.onchange = () => setActionType(r.value);
@@ -1677,8 +2075,31 @@ document.querySelectorAll('input[name="a-type"]').forEach(r => {
 async function saveAction() {
   const type = document.querySelector('input[name="a-type"]:checked').value;
   const executionMode = document.querySelector('input[name="a-execution-mode"]:checked').value;
+  const isGlobal = state.editingActionScope === "global";
+
+  let scriptDirId = null;
+  let scriptFile = null;
+  if (type === "script") {
+    if (isGlobal) {
+      const dirVal = $("a-script-dir").value;
+      if (dirVal === "__abs__") {
+        scriptDirId = null;
+        scriptFile = $("a-script-abs").value.trim() || null;
+        if (!scriptFile) return toast(t("toast.scriptAbsReq"));
+      } else if (dirVal.startsWith("dir:")) {
+        scriptDirId = Number(dirVal.slice(4));
+        scriptFile = $("a-script").value || null;
+        if (!scriptFile) return toast(t("toast.scriptReq"));
+      }
+    } else {
+      scriptFile = $("a-script").value || null;
+      if (!scriptFile) return toast(t("toast.scriptReq"));
+    }
+  }
+
   const body = {
-    script_file: type === "script" ? ($("a-script").value || null) : null,
+    script_dir_id: scriptDirId,
+    script_file: scriptFile,
     command: type === "command" ? ($("a-command").value.trim() || null) : null,
     arguments: type === "script" ? ($("a-arguments").value.trim() || null) : null,
     execution_mode: executionMode,
@@ -1687,7 +2108,7 @@ async function saveAction() {
     confirm_message: $("a-confirm-message").value.trim() || null,
     label: $("a-label").value.trim(),
     category: $("a-category").value.trim() || null,
-    services: [...document.querySelectorAll("#a-services .l-check:checked")].map(ch => ({
+    services: isGlobal ? [] : [...document.querySelectorAll("#a-services .l-check:checked")].map(ch => ({
       service_id: Number(ch.dataset.id),
       disable_when: ch.closest("label").querySelector(".l-when").value,
     })),
@@ -1695,21 +2116,26 @@ async function saveAction() {
     sort_order: Number($("a-sort").value) || 0,
   };
   if (!body.label) return toast(t("toast.labelReq"));
-  if (type === "script" && !body.script_file) return toast(t("toast.scriptReq"));
   if (type === "command" && !body.command) return toast(t("toast.commandReq"));
   try {
-    if (state.editingActionId) await api("PUT", `/api/actions/${state.editingActionId}`, body);
-    else await api("POST", `/api/projects/${state.projectId}/actions`, body);
+    if (state.editingActionId) {
+      await api("PUT", `/api/actions/${state.editingActionId}`, body);
+    } else if (isGlobal) {
+      await api("POST", "/api/global-actions", body);
+    } else {
+      await api("POST", `/api/projects/${state.projectId}/actions`, body);
+    }
     $("action-dialog").close();
     await selectProject(state.projectId);
   } catch (e) { toast(e.message); }
 }
 
-function getCategoryStats(cat) {
+function getCategoryStats(cat, scope = "project") {
   const target = normCategory(cat);
   let count = 0;
   const existingCats = new Set();
-  for (const a of state.actions) {
+  const list = scope === "global" ? state.globalActions : state.actions;
+  for (const a of list) {
     const c = normCategory(a.category);
     if (c === target) count += 1;
     if (c) existingCats.add(c);
@@ -1721,7 +2147,7 @@ function updateCategoryDialogHint() {
   if (state.editingCategory === null) return;
   const oldCat = state.editingCategory;
   const nextCat = normCategory($("cat-name-input").value);
-  const { count, existingCats } = getCategoryStats(oldCat);
+  const { count, existingCats } = getCategoryStats(oldCat, state.editingCategoryScope);
   const hintEl = $("cat-dlg-hint");
   if (oldCat !== "" && nextCat === "") {
     hintEl.textContent = t("cat.hintClear", { count });
@@ -1735,9 +2161,10 @@ function updateCategoryDialogHint() {
   }
 }
 
-function openCategoryDialog(rawCat) {
+function openCategoryDialog(rawCat, scope = "project") {
   state.editingCategory = normCategory(rawCat);
-  const { count, existingCats } = getCategoryStats(state.editingCategory);
+  state.editingCategoryScope = scope;
+  const { count, existingCats } = getCategoryStats(state.editingCategory, scope);
   const dl = $("cat-rename-list");
   dl.innerHTML = "";
   for (const c of existingCats) {
@@ -1762,13 +2189,14 @@ function openCategoryDialog(rawCat) {
 
 async function saveCategory() {
   if (state.editingCategory === null) return;
+  const scope = state.editingCategoryScope;
   const oldCat = state.editingCategory;
   const newCat = normCategory($("cat-name-input").value);
   if (oldCat === newCat) {
     $("category-dialog").close();
     return;
   }
-  const { count, existingCats } = getCategoryStats(oldCat);
+  const { count, existingCats } = getCategoryStats(oldCat, scope);
   if (oldCat !== "" && newCat === "") {
     if (!confirm(t("confirm.clearCategory", { name: oldCat, count }))) return;
   } else if (newCat !== "" && existingCats.has(newCat)) {
@@ -1777,12 +2205,19 @@ async function saveCategory() {
   const saveBtn = $("btn-save-category");
   saveBtn.disabled = true;
   try {
-    await api("POST", `/api/projects/${state.projectId}/categories/rename`, {
+    const endpoint = scope === "global"
+      ? "/api/global-actions/categories/rename"
+      : `/api/projects/${state.projectId}/categories/rename`;
+    await api("POST", endpoint, {
       old_category: oldCat || null,
       new_category: newCat || null,
     });
     $("category-dialog").close();
-    state.actions = await api("GET", `/api/projects/${state.projectId}/actions`);
+    if (scope === "global") {
+      state.globalActions = await api("GET", `/api/global-actions?project_id=${state.projectId}`);
+    } else {
+      state.actions = await api("GET", `/api/projects/${state.projectId}/actions`);
+    }
     renderActions();
   } catch (e) {
     toast(e.message);
@@ -1897,8 +2332,34 @@ narrowMQ.addEventListener("change", () => {
   state.sidebarDrawerOpen = false;
   applySidebarUI();
   applyOutputUI();
+  applyActionLayout();
 });
-window.addEventListener("resize", applyOutputWidth);
+window.addEventListener("resize", () => {
+  applyOutputWidth();
+  applyActionLayout();
+});
+if (typeof ResizeObserver !== "undefined" && $("content")) {
+  new ResizeObserver(() => applyActionLayout()).observe($("content"));
+}
+
+$("tab-project").onclick = () => {
+  if (state.effectiveSplit) return;
+  state.activeTab = "project";
+  localStorage.setItem("devdeck.actionTab", "project");
+  applyActionLayout();
+};
+$("tab-global").onclick = () => {
+  if (state.effectiveSplit) return;
+  state.activeTab = "global";
+  localStorage.setItem("devdeck.actionTab", "global");
+  applyActionLayout();
+};
+$("btn-toggle-split").onclick = () => {
+  if ($("btn-toggle-split").disabled) return;
+  state.splitMode = !state.splitMode;
+  localStorage.setItem("devdeck.actionSplit", state.splitMode ? "1" : "0");
+  applyActionLayout();
+};
 
 $("btn-add-project").onclick = () => openProjectDialog(false);
 $("btn-edit-project").onclick = () => openProjectDialog(true);
@@ -1911,8 +2372,80 @@ $("btn-del-project").onclick = async () => {
   await loadProjects();
 };
 $("btn-add-svc").onclick = e => { e.preventDefault(); $("svc-rows").appendChild(svcRow()); };
-$("btn-add-action").onclick = () => openActionDialog(null);
+$("btn-add-action").onclick = () => openActionDialog(null, state.activeTab);
+$("btn-add-project-action").onclick = () => openActionDialog(null, "project");
+$("btn-add-global-action").onclick = () => openActionDialog(null, "global");
 $("btn-save-action").onclick = saveAction;
+
+$("a-script-dir").onchange = async () => {
+  const dirSel = $("a-script-dir");
+  const val = dirSel.value;
+  if (val === "__add__") {
+    dirSel.disabled = true;
+    try {
+      const picked = await api("POST", "/api/pick-directory", {
+        initialdir: "",
+        title: t("pick.globalScriptDir"),
+      });
+      if (!picked.path) {
+        dirSel.value = state.lastScriptDirSelection || "__abs__";
+        await syncGlobalScriptDirUI();
+        return;
+      }
+      const created = await api("POST", "/api/global-script-dirs", { path: picked.path });
+      state.globalScriptDirs = await api("GET", "/api/global-script-dirs");
+      renderScriptDirSelect(`dir:${created.id}`);
+      await syncGlobalScriptDirUI();
+    } catch (e) {
+      toast(e.message);
+      dirSel.value = state.lastScriptDirSelection || "__abs__";
+      await syncGlobalScriptDirUI();
+    } finally {
+      dirSel.disabled = false;
+    }
+    return;
+  }
+  state.lastScriptDirSelection = val;
+  await syncGlobalScriptDirUI();
+};
+
+$("btn-remove-script-dir").onclick = async () => {
+  const val = $("a-script-dir").value;
+  if (!val.startsWith("dir:")) return;
+  const dirId = Number(val.slice(4));
+  const dirObj = state.globalScriptDirs.find(d => d.id === dirId);
+  if (!dirObj) return;
+  if (!confirm(t("confirm.removeScriptDir", { path: dirObj.path }))) return;
+  const selectedFile = $("a-script").value;
+  try {
+    await api("DELETE", `/api/global-script-dirs/${dirId}`);
+    state.globalScriptDirs = await api("GET", "/api/global-script-dirs");
+    renderScriptDirSelect("__abs__");
+    if (selectedFile) {
+      const sep = dirObj.path.includes("\\") ? "\\" : "/";
+      const cleanDir = dirObj.path.replace(/[\\/]+$/, "");
+      $("a-script-abs").value = `${cleanDir}${sep}${selectedFile}`;
+    }
+    await syncGlobalScriptDirUI();
+    if (state.projectId) {
+      state.globalActions = await api("GET", `/api/global-actions?project_id=${state.projectId}`);
+      renderActions();
+    }
+  } catch (e) { toast(e.message); }
+};
+
+$("browse-a-script-abs").onclick = async () => {
+  const btn = $("browse-a-script-abs");
+  btn.disabled = true;
+  try {
+    const res = await api("POST", "/api/pick-file", {
+      initialdir: $("a-script-abs").value.trim() || currentProject()?.path || "",
+      title: t("pick.scriptFile"),
+    });
+    if (res.path) $("a-script-abs").value = res.path;
+  } catch (e) { toast(e.message); }
+  finally { btn.disabled = false; }
+};
 $("btn-confirm-run-ok").onclick = () => finishConfirmRun(true);
 $("btn-confirm-run-cancel").onclick = () => finishConfirmRun(false);
 $("btn-confirm-run-close").onclick = () => finishConfirmRun(false);
@@ -1948,8 +2481,10 @@ $("category-dialog").addEventListener("click", e => {
   if (outside) dlg.close();
 });
 $("btn-del-action").onclick = async () => {
-  const a = state.actions.find(x => x.id === state.editingActionId);
-  if (!confirm(t("confirm.delAction", { label: a.label }))) return;
+  const a = findActionById(state.editingActionId);
+  if (!a) return;
+  const key = a.is_global ? "confirm.delGlobalAction" : "confirm.delAction";
+  if (!confirm(t(key, { label: a.label }))) return;
   await api("DELETE", `/api/actions/${a.id}`);
   $("action-dialog").close();
   await selectProject(state.projectId);
@@ -1960,6 +2495,7 @@ $("manage-toggle").onchange = e => {
   document.querySelectorAll("#project-list .project-item").forEach(el => {
     el.draggable = on;
   });
+  if (state.projectId) renderActions();
 };
 $("btn-shutdown").onclick = async () => {
   if (!confirm(t("confirm.shutdown"))) return;
@@ -1975,15 +2511,29 @@ $("btn-clear-output").onclick = () => {
   renderOutputTitle();
 };
 $("lang-select").onchange = e => setLang(e.target.value);
-$("action-list").addEventListener("click", e => {
+$("action-panes").addEventListener("click", async e => {
   const runBtn = e.target.closest("button.run");
   if (runBtn) return runAction(Number(runBtn.dataset.id), runBtn);
+  const hideBtn = e.target.closest("button.toggle-hide");
+  if (hideBtn) {
+    const aid = Number(hideBtn.dataset.id);
+    const nextHidden = hideBtn.dataset.hidden !== "1";
+    try {
+      await api("PUT", `/api/projects/${state.projectId}/hidden-actions/${aid}`, { hidden: nextHidden });
+      state.globalActions = await api("GET", `/api/global-actions?project_id=${state.projectId}`);
+      renderActions();
+    } catch (err) {
+      toast(err.message);
+    }
+    return;
+  }
   const editBtn = e.target.closest("button.edit");
-  if (editBtn) return openActionDialog(Number(editBtn.dataset.id));
+  if (editBtn) return openActionDialog(Number(editBtn.dataset.id), editBtn.dataset.scope || null);
   const catEditBtn = e.target.closest("button.category-edit");
   if (catEditBtn) {
     e.stopPropagation();
-    openCategoryDialog(catEditBtn.closest(".category")?.dataset.category || "");
+    const catEl = catEditBtn.closest(".category");
+    openCategoryDialog(catEl?.dataset.category || "", catEl?.dataset.scope || "project");
   }
 });
 

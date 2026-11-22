@@ -51,6 +51,41 @@ if path:
     sys.stdout.write(os.path.normpath(path))
 """
 
+_PICK_FILE_CODE = r"""
+import os, sys
+try:
+    import tkinter as tk
+    from tkinter import filedialog
+except Exception as e:
+    sys.stderr.write("tkinter unavailable: %s" % e)
+    sys.exit(2)
+raw_init = sys.argv[1] if len(sys.argv) > 1 else ""
+title = sys.argv[2] if len(sys.argv) > 2 else "Select script file"
+initialdir = ""
+if raw_init:
+    if os.path.isfile(raw_init):
+        initialdir = os.path.dirname(raw_init)
+    elif os.path.isdir(raw_init):
+        initialdir = raw_init
+root = tk.Tk()
+root.withdraw()
+try:
+    root.attributes("-topmost", True)
+except Exception:
+    pass
+path = filedialog.askopenfilename(
+    initialdir=initialdir or None,
+    title=title,
+    filetypes=[
+        ("Supported scripts", "*.ps1 *.py *.sh *.mjs *.js *.cmd *.bat"),
+        ("All files", "*.*"),
+    ],
+)
+root.destroy()
+if path:
+    sys.stdout.write(os.path.normpath(path))
+"""
+
 db.init_db()
 
 LOCAL_NAMES = {"127.0.0.1", "localhost"}
@@ -112,6 +147,7 @@ class ActionServiceLink(BaseModel):
 
 
 class ActionIn(BaseModel):
+    script_dir_id: int | None = None
     script_file: str | None = None
     command: str | None = None
     arguments: str | None = None
@@ -126,7 +162,9 @@ class ActionIn(BaseModel):
     sort_order: int = 0
 
     def validate_source(self):
-        if bool(self.script_file) == bool(self.command):
+        has_script = bool(self.script_file and self.script_file.strip())
+        has_cmd = bool(self.command and self.command.strip())
+        if has_script == has_cmd:
             raise HTTPException(400, detail={"key": "err.scriptXorCommand"})
 
     def validate_execution(self):
@@ -134,9 +172,26 @@ class ActionIn(BaseModel):
             raise HTTPException(400, detail={"key": "err.adminRequiresTerminal"})
 
 
+class GlobalScriptDirIn(BaseModel):
+    path: str
+
+
+class ActionVisibilityIn(BaseModel):
+    hidden: bool
+
+
+class RunActionIn(BaseModel):
+    project_id: int | None = None
+
+
 class PickDirIn(BaseModel):
     initialdir: str | None = None  # 對話框起始資料夾（如專案路徑）；不存在則忽略
     title: str | None = None       # 對話框標題（由前端依語系帶入）
+
+
+class PickFileIn(BaseModel):
+    initialdir: str | None = None
+    title: str | None = None
 
 
 class CategoryReorderIn(BaseModel):
@@ -319,6 +374,46 @@ def _norm_category(cat: str | None) -> str | None:
     return cleaned or None
 
 
+def _norm_path(path: str) -> str:
+    return os.path.normpath(path.strip())
+
+
+def _validate_global_script(conn, body: ActionIn):
+    if body.command and body.command.strip():
+        return
+    script_file = (body.script_file or "").strip()
+    if body.script_dir_id is not None:
+        row = conn.execute(
+            "SELECT id FROM global_script_dirs WHERE id=?", (body.script_dir_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(400, detail={"key": "err.scriptDirNotFound"})
+    else:
+        if not Path(script_file).is_absolute():
+            raise HTTPException(400, detail={"key": "err.scriptPathMustBeAbsolute"})
+
+
+def _format_action_row(
+    row: dict, *, services: list | None = None, hidden: bool | None = None
+) -> dict:
+    script_dir_path = row.pop("script_dir_path", None)
+    is_global = row["project_id"] is None
+    row["run_as_admin"] = bool(row.get("run_as_admin"))
+    row["confirm_before_run"] = bool(row.get("confirm_before_run"))
+    row["is_global"] = is_global
+    row["services"] = services if services is not None else []
+    if is_global and row.get("script_file"):
+        if row.get("script_dir_id") is not None and script_dir_path:
+            row["resolved_script_path"] = str(Path(script_dir_path) / row["script_file"])
+        else:
+            row["resolved_script_path"] = row["script_file"]
+    else:
+        row["resolved_script_path"] = None
+    if hidden is not None:
+        row["hidden"] = hidden
+    return row
+
+
 def _replace_links(conn, action_id: int, links: list[ActionServiceLink]):
     conn.execute("DELETE FROM action_services WHERE action_id=?", (action_id,))
     for link in links:
@@ -327,6 +422,96 @@ def _replace_links(conn, action_id: int, links: list[ActionServiceLink]):
             (action_id, link.service_id, link.disable_when),
         )
 
+
+# ---------- global script dirs ----------
+
+@app.get("/api/global-script-dirs")
+def list_global_script_dirs():
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM global_script_dirs ORDER BY sort_order, id"
+        ).fetchall()
+    return [
+        {**dict(r), "exists": Path(r["path"]).is_dir()}
+        for r in rows
+    ]
+
+
+@app.post("/api/global-script-dirs")
+def create_global_script_dir(body: GlobalScriptDirIn):
+    norm = _norm_path(body.path)
+    if not norm or not Path(norm).is_dir():
+        raise HTTPException(400, detail={"key": "err.scriptsDirMissing", "params": {"dir": body.path}})
+    norm_key = os.path.normcase(norm)
+    with db.get_conn() as conn:
+        for existing in conn.execute("SELECT id, path FROM global_script_dirs"):
+            if os.path.normcase(existing["path"]) == norm_key:
+                return {"id": existing["id"], "path": existing["path"], "created": False}
+        next_order = conn.execute(
+            "SELECT COALESCE(MAX(sort_order), 0) FROM global_script_dirs"
+        ).fetchone()[0] + 10
+        cur = conn.execute(
+            "INSERT INTO global_script_dirs (path, sort_order) VALUES (?,?)",
+            (norm, next_order),
+        )
+        return {"id": cur.lastrowid, "path": norm, "created": True}
+
+
+@app.delete("/api/global-script-dirs/{dir_id}")
+def delete_global_script_dir(dir_id: int):
+    with db.get_conn() as conn:
+        dir_row = conn.execute(
+            "SELECT * FROM global_script_dirs WHERE id=?", (dir_id,)
+        ).fetchone()
+        if not dir_row:
+            raise HTTPException(404, detail={"key": "err.scriptDirNotFound"})
+        affected = conn.execute(
+            "SELECT id, script_file FROM actions WHERE script_dir_id=?", (dir_id,)
+        ).fetchall()
+        converted = 0
+        for act in affected:
+            sf = act["script_file"]
+            if sf:
+                p = Path(sf)
+                abs_path = str(p if p.is_absolute() else (Path(dir_row["path"]) / p))
+                conn.execute(
+                    "UPDATE actions SET script_dir_id=NULL, script_file=? WHERE id=?",
+                    (abs_path, act["id"]),
+                )
+                converted += 1
+            else:
+                conn.execute("UPDATE actions SET script_dir_id=NULL WHERE id=?", (act["id"],))
+        conn.execute("DELETE FROM global_script_dirs WHERE id=?", (dir_id,))
+    return {"ok": True, "converted": converted}
+
+
+@app.get("/api/global-script-dirs/{dir_id}/scan")
+def scan_global_script_dir(dir_id: int):
+    with db.get_conn() as conn:
+        dir_row = conn.execute(
+            "SELECT * FROM global_script_dirs WHERE id=?", (dir_id,)
+        ).fetchone()
+        if not dir_row:
+            raise HTTPException(404, detail={"key": "err.scriptDirNotFound"})
+        scripts_dir = Path(dir_row["path"])
+        if not scripts_dir.is_dir():
+            raise HTTPException(400, detail={"key": "err.scriptsDirMissing", "params": {"dir": str(scripts_dir)}})
+        added = {
+            r["script_file"]
+            for r in conn.execute(
+                "SELECT script_file FROM actions"
+                " WHERE project_id IS NULL AND script_dir_id=? AND script_file IS NOT NULL",
+                (dir_id,),
+            )
+        }
+    files = sorted(
+        p.name for p in scripts_dir.iterdir()
+        if p.is_file() and p.suffix.lower() in SCRIPT_EXTS
+    )
+    return [{"file": f, "added": f in added} for f in files]
+
+
+# ---------- project & global actions ----------
 
 @app.get("/api/projects/{project_id}/actions")
 def list_actions(project_id: int):
@@ -342,11 +527,7 @@ def list_actions(project_id: int):
         ):
             links.setdefault(r["action_id"], []).append(
                 {"service_id": r["service_id"], "disable_when": r["disable_when"]})
-    for a in actions:
-        a["run_as_admin"] = bool(a.get("run_as_admin"))
-        a["confirm_before_run"] = bool(a.get("confirm_before_run"))
-        a["services"] = links.get(a["id"], [])
-    return actions
+    return [_format_action_row(a, services=links.get(a["id"], [])) for a in actions]
 
 
 @app.post("/api/projects/{project_id}/actions")
@@ -355,14 +536,60 @@ def create_action(project_id: int, body: ActionIn):
     body.validate_source()
     body.validate_execution()
     confirm_msg = _norm_confirm_message(body.confirm_message)
+    script_file = body.script_file.strip() if body.script_file else None
+    command = body.command.strip() if body.command else None
     with db.get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO actions (project_id, script_file, command, arguments, execution_mode, run_as_admin, confirm_before_run, confirm_message, label, workdir, category, sort_order)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-            (project_id, body.script_file, body.command, body.arguments, body.execution_mode, int(body.run_as_admin),
+            "INSERT INTO actions (project_id, script_dir_id, script_file, command, arguments, execution_mode, run_as_admin, confirm_before_run, confirm_message, label, workdir, category, sort_order)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (project_id, None, script_file, command, body.arguments, body.execution_mode, int(body.run_as_admin),
              int(body.confirm_before_run), confirm_msg, body.label, body.workdir, body.category, body.sort_order),
         )
         _replace_links(conn, cur.lastrowid, body.services)
+        return {"id": cur.lastrowid}
+
+
+@app.get("/api/global-actions")
+def list_global_actions(project_id: int | None = None):
+    if project_id is not None:
+        get_project(project_id)
+    with db.get_conn() as conn:
+        actions = [dict(r) for r in conn.execute(
+            "SELECT a.*, d.path AS script_dir_path"
+            " FROM actions a LEFT JOIN global_script_dirs d ON d.id = a.script_dir_id"
+            " WHERE a.project_id IS NULL ORDER BY a.sort_order, a.id"
+        )]
+        hidden_ids: set[int] = set()
+        if project_id is not None:
+            hidden_ids = {
+                r["action_id"]
+                for r in conn.execute(
+                    "SELECT action_id FROM project_hidden_actions WHERE project_id=?",
+                    (project_id,),
+                )
+            }
+    return [
+        _format_action_row(a, services=[], hidden=(a["id"] in hidden_ids))
+        for a in actions
+    ]
+
+
+@app.post("/api/global-actions")
+def create_global_action(body: ActionIn):
+    body.validate_source()
+    body.validate_execution()
+    confirm_msg = _norm_confirm_message(body.confirm_message)
+    script_file = body.script_file.strip() if body.script_file else None
+    command = body.command.strip() if body.command else None
+    script_dir_id = None if command else body.script_dir_id
+    with db.get_conn() as conn:
+        _validate_global_script(conn, body)
+        cur = conn.execute(
+            "INSERT INTO actions (project_id, script_dir_id, script_file, command, arguments, execution_mode, run_as_admin, confirm_before_run, confirm_message, label, workdir, category, sort_order)"
+            " VALUES (NULL,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (script_dir_id, script_file, command, body.arguments, body.execution_mode, int(body.run_as_admin),
+             int(body.confirm_before_run), confirm_msg, body.label, body.workdir, body.category, body.sort_order),
+        )
         return {"id": cur.lastrowid}
 
 
@@ -371,16 +598,30 @@ def update_action(action_id: int, body: ActionIn):
     body.validate_source()
     body.validate_execution()
     confirm_msg = _norm_confirm_message(body.confirm_message)
+    script_file = body.script_file.strip() if body.script_file else None
+    command = body.command.strip() if body.command else None
     with db.get_conn() as conn:
-        cur = conn.execute(
-            "UPDATE actions SET script_file=?, command=?, arguments=?, execution_mode=?, run_as_admin=?, confirm_before_run=?, confirm_message=?, label=?, workdir=?, category=?, sort_order=?"
+        existing = conn.execute(
+            "SELECT id, project_id FROM actions WHERE id=?", (action_id,)
+        ).fetchone()
+        if not existing:
+            raise HTTPException(404, detail={"key": "err.actionNotFound"})
+        is_global = existing["project_id"] is None
+        script_dir_id = None
+        if is_global:
+            _validate_global_script(conn, body)
+            if not command:
+                script_dir_id = body.script_dir_id
+        conn.execute(
+            "UPDATE actions SET script_dir_id=?, script_file=?, command=?, arguments=?, execution_mode=?, run_as_admin=?, confirm_before_run=?, confirm_message=?, label=?, workdir=?, category=?, sort_order=?"
             " WHERE id=?",
-            (body.script_file, body.command, body.arguments, body.execution_mode, int(body.run_as_admin),
+            (script_dir_id, script_file, command, body.arguments, body.execution_mode, int(body.run_as_admin),
              int(body.confirm_before_run), confirm_msg, body.label, body.workdir, body.category, body.sort_order, action_id),
         )
-        if cur.rowcount == 0:
-            raise HTTPException(404, detail={"key": "err.actionNotFound"})
-        _replace_links(conn, action_id, body.services)
+        if is_global:
+            conn.execute("DELETE FROM action_services WHERE action_id=?", (action_id,))
+        else:
+            _replace_links(conn, action_id, body.services)
     return {"ok": True}
 
 
@@ -393,105 +634,172 @@ def delete_action(action_id: int):
     return {"ok": True}
 
 
+@app.put("/api/projects/{project_id}/hidden-actions/{action_id}")
+def set_hidden_action(project_id: int, action_id: int, body: ActionVisibilityIn):
+    get_project(project_id)
+    with db.get_conn() as conn:
+        act = conn.execute(
+            "SELECT id, project_id FROM actions WHERE id=?", (action_id,)
+        ).fetchone()
+        if not act:
+            raise HTTPException(404, detail={"key": "err.actionNotFound"})
+        if act["project_id"] is not None:
+            raise HTTPException(400, detail={"key": "err.notGlobalAction"})
+        if body.hidden:
+            conn.execute(
+                "INSERT OR IGNORE INTO project_hidden_actions (project_id, action_id) VALUES (?,?)",
+                (project_id, action_id),
+            )
+        else:
+            conn.execute(
+                "DELETE FROM project_hidden_actions WHERE project_id=? AND action_id=?",
+                (project_id, action_id),
+            )
+    return {"ok": True, "hidden": body.hidden}
+
+
+def _reorder_categories_scope(conn, project_id: int | None, categories: list[str | None]):
+    if project_id is None:
+        actions = [dict(r) for r in conn.execute(
+            "SELECT id, category, sort_order FROM actions WHERE project_id IS NULL ORDER BY sort_order, id"
+        )]
+    else:
+        actions = [dict(r) for r in conn.execute(
+            "SELECT id, category, sort_order FROM actions WHERE project_id=? ORDER BY sort_order, id",
+            (project_id,),
+        )]
+    groups: dict[str | None, list[dict]] = {}
+    for a in actions:
+        cat = _norm_category(a["category"])
+        groups.setdefault(cat, []).append(a)
+
+    ordered_keys: list[str | None] = []
+    for c in categories:
+        norm_c = _norm_category(c)
+        if norm_c not in ordered_keys:
+            ordered_keys.append(norm_c)
+
+    for cat in groups.keys():
+        if cat not in ordered_keys:
+            ordered_keys.append(cat)
+
+    current_sort = 10
+    for cat in ordered_keys:
+        for act in groups.get(cat, []):
+            conn.execute(
+                "UPDATE actions SET sort_order=? WHERE id=?",
+                (current_sort, act["id"]),
+            )
+            current_sort += 10
+        current_sort += 10
+
+
+def _rename_category_scope(
+    conn, project_id: int | None, old_category: str | None, new_category: str | None
+) -> dict:
+    old_cat = _norm_category(old_category)
+    new_cat = _norm_category(new_category)
+    if project_id is None:
+        actions = [dict(r) for r in conn.execute(
+            "SELECT id, category, sort_order FROM actions WHERE project_id IS NULL ORDER BY sort_order, id"
+        )]
+    else:
+        actions = [dict(r) for r in conn.execute(
+            "SELECT id, category, sort_order FROM actions WHERE project_id=? ORDER BY sort_order, id",
+            (project_id,),
+        )]
+    groups: dict[str | None, list[dict]] = {}
+    for a in actions:
+        cat = _norm_category(a["category"])
+        groups.setdefault(cat, []).append(a)
+
+    source_actions = groups.get(old_cat, [])
+    if not source_actions:
+        return {"ok": True, "updated": 0, "merged": False}
+
+    if old_cat == new_cat:
+        for act in source_actions:
+            if act["category"] != new_cat:
+                conn.execute(
+                    "UPDATE actions SET category=? WHERE id=?",
+                    (new_cat, act["id"]),
+                )
+        return {"ok": True, "updated": 0, "merged": False}
+
+    merged = new_cat in groups
+    for act in source_actions:
+        conn.execute(
+            "UPDATE actions SET category=? WHERE id=?",
+            (new_cat, act["id"]),
+        )
+
+    if merged:
+        current_sort = 10
+        for cat, cat_actions in groups.items():
+            if cat == old_cat:
+                continue
+            ordered_group = cat_actions + source_actions if cat == new_cat else cat_actions
+            for act in ordered_group:
+                conn.execute(
+                    "UPDATE actions SET sort_order=? WHERE id=?",
+                    (current_sort, act["id"]),
+                )
+                current_sort += 10
+            current_sort += 10
+
+    return {"ok": True, "updated": len(source_actions), "merged": merged}
+
+
 @app.post("/api/projects/{project_id}/categories/reorder")
 def reorder_categories(project_id: int, body: CategoryReorderIn):
     get_project(project_id)
     with db.get_conn() as conn:
-        actions = [dict(r) for r in conn.execute(
-            "SELECT id, category, sort_order FROM actions WHERE project_id=? ORDER BY sort_order, id",
-            (project_id,)
-        )]
-        groups: dict[str | None, list[dict]] = {}
-        for a in actions:
-            cat = _norm_category(a["category"])
-            groups.setdefault(cat, []).append(a)
-
-        ordered_keys: list[str | None] = []
-        for c in body.categories:
-            norm_c = _norm_category(c)
-            if norm_c not in ordered_keys:
-                ordered_keys.append(norm_c)
-
-        for cat in groups.keys():
-            if cat not in ordered_keys:
-                ordered_keys.append(cat)
-
-        current_sort = 10
-        for cat in ordered_keys:
-            cat_actions = groups.get(cat, [])
-            for act in cat_actions:
-                conn.execute(
-                    "UPDATE actions SET sort_order=? WHERE id=?",
-                    (current_sort, act["id"])
-                )
-                current_sort += 10
-            current_sort += 10
+        _reorder_categories_scope(conn, project_id, body.categories)
     return {"ok": True}
 
 
 @app.post("/api/projects/{project_id}/categories/rename")
 def rename_category(project_id: int, body: CategoryRenameIn):
     get_project(project_id)
-    old_cat = _norm_category(body.old_category)
-    new_cat = _norm_category(body.new_category)
     with db.get_conn() as conn:
-        actions = [dict(r) for r in conn.execute(
-            "SELECT id, category, sort_order FROM actions WHERE project_id=? ORDER BY sort_order, id",
-            (project_id,)
-        )]
-        groups: dict[str | None, list[dict]] = {}
-        for a in actions:
-            cat = _norm_category(a["category"])
-            groups.setdefault(cat, []).append(a)
+        return _rename_category_scope(conn, project_id, body.old_category, body.new_category)
 
-        source_actions = groups.get(old_cat, [])
-        if not source_actions:
-            return {"ok": True, "updated": 0, "merged": False}
 
-        if old_cat == new_cat:
-            for act in source_actions:
-                if act["category"] != new_cat:
-                    conn.execute(
-                        "UPDATE actions SET category=? WHERE id=? AND project_id=?",
-                        (new_cat, act["id"], project_id),
-                    )
-            return {"ok": True, "updated": 0, "merged": False}
+@app.post("/api/global-actions/categories/reorder")
+def reorder_global_categories(body: CategoryReorderIn):
+    with db.get_conn() as conn:
+        _reorder_categories_scope(conn, None, body.categories)
+    return {"ok": True}
 
-        merged = new_cat in groups
-        for act in source_actions:
-            conn.execute(
-                "UPDATE actions SET category=? WHERE id=? AND project_id=?",
-                (new_cat, act["id"], project_id),
-            )
 
-        if merged:
-            current_sort = 10
-            for cat, cat_actions in groups.items():
-                if cat == old_cat:
-                    continue
-                ordered_group = cat_actions + source_actions if cat == new_cat else cat_actions
-                for act in ordered_group:
-                    conn.execute(
-                        "UPDATE actions SET sort_order=? WHERE id=? AND project_id=?",
-                        (current_sort, act["id"], project_id),
-                    )
-                    current_sort += 10
-                current_sort += 10
-
-    return {"ok": True, "updated": len(source_actions), "merged": merged}
+@app.post("/api/global-actions/categories/rename")
+def rename_global_category(body: CategoryRenameIn):
+    with db.get_conn() as conn:
+        return _rename_category_scope(conn, None, body.old_category, body.new_category)
 
 
 # ---------- run (SSE) ----------
 
 @app.post("/api/actions/{action_id}/run")
-async def run_action(action_id: int, _body: dict = Body(default={})):
+async def run_action(action_id: int, body: RunActionIn = Body(default_factory=RunActionIn)):
     # POST + JSON body：跨來源時瀏覽器必先 preflight，惡意網頁無法直接觸發執行
     with db.get_conn() as conn:
-        action = conn.execute("SELECT * FROM actions WHERE id=?", (action_id,)).fetchone()
+        action = conn.execute(
+            "SELECT a.*, d.path AS script_dir_path"
+            " FROM actions a LEFT JOIN global_script_dirs d ON d.id = a.script_dir_id"
+            " WHERE a.id=?",
+            (action_id,),
+        ).fetchone()
     if not action:
         raise HTTPException(404, detail={"key": "err.actionNotFound"})
     action = dict(action)
-    project = get_project(action["project_id"])
+    is_global = action["project_id"] is None
+    if is_global:
+        if body.project_id is None:
+            raise HTTPException(400, detail={"key": "err.projectRequiredForGlobal"})
+        project = get_project(body.project_id)
+    else:
+        project = get_project(action["project_id"])
 
     def ev(event: str, data) -> str:
         return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
@@ -503,16 +811,31 @@ async def run_action(action_id: int, _body: dict = Body(default={})):
                 cmd = runner.resolve_shell_command(action["command"])
                 env = runner.venv_env(project)
             else:
-                script_path = Path(project["path"]) / project["scripts_dir"] / action["script_file"]
+                if is_global:
+                    if action["script_dir_id"] is not None:
+                        if not action["script_dir_path"]:
+                            yield ev("error", {"key": "err.scriptDirNotFound", "params": {}})
+                            return
+                        script_path = Path(action["script_dir_path"]) / action["script_file"]
+                    else:
+                        script_path = Path(action["script_file"])
+                    env = runner.venv_env(project)
+                else:
+                    script_path = Path(project["path"]) / project["scripts_dir"] / action["script_file"]
                 if not script_path.is_file():
                     yield ev("error", {"key": "err.scriptNotFound", "params": {"path": str(script_path)}})
                     return
-                cmd = runner.resolve_command(script_path, project)
+                cmd = runner.resolve_command(
+                    script_path, project, allow_system_python=is_global
+                )
                 cmd.extend(runner.parse_arguments(action["arguments"]))
         except runner.RunError as e:
             yield ev("error", {"key": e.key, "params": e.params})
             return
-        cwd = action["workdir"] or project["path"]
+        cwd = runner.resolve_workdir(action["workdir"], project["path"])
+        if not Path(cwd).is_dir():
+            yield ev("error", {"key": "err.workdirMissing", "params": {"path": cwd}})
+            return
         run_as_admin = bool(action.get("run_as_admin"))
         if run_as_admin and action["execution_mode"] != "terminal":
             yield ev("error", {"key": "err.adminRequiresTerminal", "params": {}})
@@ -539,30 +862,51 @@ async def run_action(action_id: int, _body: dict = Body(default={})):
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
-# ---------- pick directory ----------
+# ---------- pick directory / file ----------
 
-@app.post("/api/pick-directory")
-async def pick_directory(body: PickDirIn):
-    """開系統原生資料夾選擇視窗，回傳選定的絕對路徑（取消回 null）。
-
-    dialog 在跑 uvicorn 的機器桌面彈出——devdeck 只綁 127.0.0.1，所以就是使用者本機。
-    """
+async def _run_picker(
+    code: str, initialdir: str, title: str, *, unavail_key: str, failed_key: str
+) -> dict:
+    """用短命子行程開啟系統原生資料夾或檔案選擇視窗。"""
     try:
         proc = await asyncio.create_subprocess_exec(
-            sys.executable, "-c", _PICK_DIR_CODE,
-            body.initialdir or "", body.title or "Select folder",
+            sys.executable, "-c", code,
+            initialdir, title,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         out, err = await proc.communicate()
     except OSError as e:
-        raise HTTPException(500, detail={"key": "err.pickerFailed", "params": {"detail": str(e)}})
+        raise HTTPException(500, detail={"key": failed_key, "params": {"detail": str(e)}})
     if proc.returncode != 0:
-        # 多半是缺 tkinter（例如 Linux 未安裝 python3-tk）
         detail = err.decode("utf-8", "replace").strip()[-300:]
-        raise HTTPException(500, detail={"key": "err.pickerUnavailable", "params": {"detail": detail}})
+        raise HTTPException(500, detail={"key": unavail_key, "params": {"detail": detail}})
     path = out.decode("utf-8", errors="replace").strip()
     return {"path": path or None}
+
+
+@app.post("/api/pick-directory")
+async def pick_directory(body: PickDirIn):
+    """開系統原生資料夾選擇視窗，回傳選定的絕對路徑（取消回 null）。"""
+    return await _run_picker(
+        _PICK_DIR_CODE,
+        body.initialdir or "",
+        body.title or "Select folder",
+        unavail_key="err.pickerUnavailable",
+        failed_key="err.pickerFailed",
+    )
+
+
+@app.post("/api/pick-file")
+async def pick_file(body: PickFileIn):
+    """開系統原生檔案選擇視窗，回傳選定的腳本絕對路徑（取消回 null）。"""
+    return await _run_picker(
+        _PICK_FILE_CODE,
+        body.initialdir or "",
+        body.title or "Select script file",
+        unavail_key="err.filePickerUnavailable",
+        failed_key="err.filePickerFailed",
+    )
 
 
 # ---------- health ----------
