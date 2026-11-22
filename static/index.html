@@ -450,6 +450,11 @@
     background: rgba(79,140,255,.12); border: 1px solid rgba(79,140,255,.35);
     color: var(--text); font-size: 13px; line-height: 1.45;
   }
+  .dialog-edit-hint {
+    margin: 12px 0 0; padding: 8px 12px; border-radius: 6px;
+    background: rgba(255, 255, 255, .04); border: 1px solid var(--border);
+    color: var(--muted); font-size: 12.5px; line-height: 1.5;
+  }
   .script-dir-field { display: flex; gap: 6px; margin-top: 4px; align-items: center; }
   .script-dir-field select { flex: 1 1 0; min-width: 0; margin-top: 0; }
   .script-dir-field .browse { flex: none; padding: 6px 10px; }
@@ -697,6 +702,7 @@
     </table>
     <button id="btn-add-svc" data-i18n="proj.addSvc" style="font-size:12px">＋ 加入服務</button>
   </fieldset>
+  <p id="p-add-edit-hint" class="dialog-edit-hint" data-i18n="proj.addEditHint">提示：建立完成後，可對左側欄專案項目按「滑鼠右鍵 → 專案設定」（或點擊專案標題列的「專案設定」圖示按鈕）重新編輯專案，並於該處設定「服務（狀態監測）」。</p>
   <div class="btns">
     <button id="btn-del-project" class="danger" hidden data-i18n="proj.del">刪除專案</button>
     <span class="spacer"></span>
@@ -774,6 +780,7 @@
       </fieldset>
     </section>
   </div>
+  <p id="a-add-edit-hint" class="dialog-edit-hint" data-i18n="act.addEditHint">提示：建立完成後，可對動作按鈕按「滑鼠右鍵 → 按鈕設定」重新開啟編輯或刪除。</p>
   <div class="btns">
     <button id="btn-del-action" class="danger" hidden data-i18n="act.del">刪除動作</button>
     <span class="spacer"></span>
@@ -916,6 +923,7 @@ const I18N = {
     "pick.scriptFile": "選擇腳本檔案",
     "proj.addTitle": "新增專案",
     "proj.editTitle": "編輯專案",
+    "proj.addEditHint": "提示：建立完成後，可對左側欄專案項目按「滑鼠右鍵 → 專案設定」（或點擊專案標題列的「專案設定」圖示按鈕）重新編輯專案，並於該處設定「服務（狀態監測）」。",
     "proj.name": "專案名稱",
     "proj.path": "專案路徑",
     "proj.scriptsDir": "腳本目錄（相對於專案路徑）",
@@ -941,6 +949,7 @@ const I18N = {
     "act.editTitle": "編輯動作",
     "act.addGlobalTitle": "新增通用動作",
     "act.editGlobalTitle": "編輯通用動作",
+    "act.addEditHint": "提示：建立完成後，可對動作按鈕按「滑鼠右鍵 → 按鈕設定」重新開啟編輯或刪除。",
     "act.typeLabel": "動作類型：",
     "act.typeScript": "腳本檔案",
     "act.typeCommand": "直接指令",
@@ -1135,6 +1144,7 @@ const I18N = {
     "pick.scriptFile": "Select script file",
     "proj.addTitle": "Add project",
     "proj.editTitle": "Edit project",
+    "proj.addEditHint": 'Tip: After creating the project, right-click it in the left sidebar and select "Project settings" (or click the "Project settings" icon button in the project header bar) to edit the project and configure Services (status monitoring).',
     "proj.name": "Project name",
     "proj.path": "Project path",
     "proj.scriptsDir": "Scripts folder (relative to project path)",
@@ -1160,6 +1170,7 @@ const I18N = {
     "act.editTitle": "Edit action",
     "act.addGlobalTitle": "Add global action",
     "act.editGlobalTitle": "Edit global action",
+    "act.addEditHint": 'Tip: After creating the action, right-click the action button and select "Button settings" to edit or delete it.',
     "act.typeLabel": "Action type:",
     "act.typeScript": "Script file",
     "act.typeCommand": "Direct command",
@@ -2953,6 +2964,7 @@ async function openProjectDialog(editing, projectId = null) {
     $("p-venv").value = ".venv";
     $("btn-del-project").hidden = true;
     $("svc-fieldset").hidden = true;
+    $("p-add-edit-hint").hidden = false;
     $("svc-rows").innerHTML = "";
     $("project-dialog").showModal();
     return;
@@ -2978,6 +2990,7 @@ async function openProjectDialog(editing, projectId = null) {
   $("p-venv").value = p.venv_path;
   $("btn-del-project").hidden = false;
   $("svc-fieldset").hidden = false;
+  $("p-add-edit-hint").hidden = true;
   const tbody = $("svc-rows");
   tbody.innerHTML = "";
   for (const s of services) tbody.appendChild(svcRow(s));
@@ -3191,6 +3204,7 @@ async function openActionDialog(actionId, scope = null) {
   syncConfirmFields();
   $("a-sort").value = a?.sort_order ?? 0;
   $("btn-del-action").hidden = !a;
+  $("a-add-edit-hint").hidden = Boolean(a);
   $("action-dialog").showModal();
 }
 
