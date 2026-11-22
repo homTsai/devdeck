@@ -159,27 +159,10 @@
   .action-panel-controls {
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: none;
   }
-  .switch-control {
-    display: inline-flex; align-items: center; gap: 7px;
-    background: transparent; border: 1px solid var(--border); border-radius: 999px;
-    padding: 4px 10px 4px 6px; font-size: 13px; color: var(--muted);
-    white-space: nowrap; transition: border-color .15s ease, color .15s ease, background .15s ease;
+  .category-sort-btn {
+    gap: 5px; padding: 5px 10px; font-size: 13px; border-color: var(--border);
   }
-  .switch-control:hover { color: var(--text); border-color: var(--accent); background: var(--hover); }
-  .switch-control:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
-  .switch-control[aria-checked="true"] {
-    color: var(--text); border-color: var(--accent); background: rgba(79,140,255,.14);
-  }
-  .switch-track {
-    position: relative; width: 30px; height: 17px; border-radius: 999px; flex: none;
-    background: var(--border); transition: background .18s ease;
-  }
-  .switch-thumb {
-    position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%;
-    background: #d8d9e0; transition: transform .18s ease, background .18s ease;
-  }
-  .switch-control[aria-checked="true"] .switch-track { background: var(--accent); }
-  .switch-control[aria-checked="true"] .switch-thumb { transform: translateX(13px); background: #fff; }
+  .category-sort-btn:disabled { border-color: var(--border); }
   #content { flex: 1; overflow-y: auto; padding: 16px; min-height: 0; }
   .empty { color: var(--muted); text-align: center; margin-top: 60px; }
 
@@ -206,9 +189,15 @@
   }
   .category-header {
     display: flex; align-items: center; gap: 6px;
-    margin: 0 0 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px;
-    user-select: none;
+    margin: 0 0 8px; border-bottom: 1px solid var(--border); padding: 2px 4px 4px;
+    border-radius: 5px 5px 0 0; user-select: none;
+    transition: background .12s ease, border-color .12s ease;
   }
+  .category-header.is-context-target {
+    background: rgba(79,140,255,.14);
+    border-bottom-color: var(--accent);
+  }
+  .category-header.is-context-target h2 { color: var(--text); }
   .category-header h2 {
     font-size: 13px; color: var(--muted); font-weight: normal; margin: 0;
   }
@@ -219,24 +208,14 @@
   }
   .category-handle:hover { color: var(--text); background: var(--hover); }
   .category-handle:active { cursor: grabbing; }
-  #center-pane.is-managing-actions .category-handle { display: inline-flex; align-items: center; }
-  .category-edit {
-    display: none; border: none; background: transparent; color: var(--muted);
-    padding: 2px 5px; border-radius: 4px; cursor: pointer; line-height: 1;
-  }
-  .category-edit:hover, .category-edit:focus-visible {
-    color: var(--text); background: var(--hover); outline: none;
-  }
-  #center-pane.is-managing-actions .category-edit {
-    display: inline-flex; align-items: center; justify-content: center;
-  }
-  #center-pane.is-managing-actions .category-header { cursor: grab; }
-  #center-pane.is-managing-actions .category-header:active { cursor: grabbing; }
-  #center-pane.is-managing-actions .category.dragging { opacity: .3; }
-  #center-pane.is-managing-actions .category.drag-over-top {
+  #center-pane.is-sorting-categories .action-pane.can-sort .category-handle { display: inline-flex; align-items: center; }
+  #center-pane.is-sorting-categories .action-pane.can-sort .category-header { cursor: grab; }
+  #center-pane.is-sorting-categories .action-pane.can-sort .category-header:active { cursor: grabbing; }
+  #center-pane.is-sorting-categories .category.dragging { opacity: .3; }
+  #center-pane.is-sorting-categories .category.drag-over-top {
     box-shadow: 0 -3px 0 0 var(--accent);
   }
-  #center-pane.is-managing-actions .category.drag-over-bottom {
+  #center-pane.is-sorting-categories .category.drag-over-bottom {
     box-shadow: 0 3px 0 0 var(--accent);
   }
   .actions { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -269,12 +248,6 @@
   .action > .run.running { color: var(--accent); }
   .action > .run:disabled { opacity: .35; cursor: not-allowed; pointer-events: none; }
   .action > .run:disabled:hover { background: none; }
-  .action .mgmt { display: none; }
-  #center-pane.is-managing-actions .action .mgmt {
-    display: flex; flex-direction: column; border-left: 1px solid var(--border);
-  }
-  .action .mgmt button { border: none; border-radius: 0; padding: 2px 8px; flex: 1; font-size: 12px; }
-  .action .mgmt button + button { border-top: 1px solid var(--border); }
   .action.is-hidden-action { opacity: .48; border-style: dashed; }
   .action .hidden-pill {
     display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px;
@@ -303,11 +276,11 @@
   #action-tabs-bar.is-split .action-tab.active {
     background: transparent; border-color: transparent; color: var(--muted);
   }
-  .split-toggle {
+  .split-toggle, .hidden-global-toggle {
     display: inline-flex; align-items: center; gap: 5px;
     font-size: 12px; padding: 4px 10px; color: var(--muted); background: var(--panel);
   }
-  .split-toggle.active {
+  .split-toggle.active, .hidden-global-toggle.active {
     background: rgba(79,140,255,.16); border-color: var(--accent); color: #fff;
   }
   .split-toggle:disabled { opacity: .4; cursor: not-allowed; }
@@ -579,9 +552,9 @@
         </div>
         <span class="spacer"></span>
         <div class="action-panel-controls">
-          <button type="button" id="btn-action-manage" class="switch-control" role="switch" aria-checked="false">
-            <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
-            <span class="switch-label" data-i18n="actions.manageMode">動作管理</span>
+          <button type="button" id="btn-category-sort" class="icon-btn category-sort-btn" aria-pressed="false" title="分類排序" aria-label="分類排序">
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M5.5 2.25a.6.6 0 0 1 .42.18l2.5 2.5a.6.6 0 1 1-.84.84L6.1 4.3v8.95a.6.6 0 0 1-1.2 0V4.3L3.42 5.77a.6.6 0 1 1-.84-.84l2.5-2.5a.6.6 0 0 1 .42-.18zm5 11.5a.6.6 0 0 1-.42-.18l-2.5-2.5a.6.6 0 1 1 .84-.84l1.48 1.47V2.75a.6.6 0 0 1 1.2 0v8.95l1.48-1.47a.6.6 0 1 1 .84.84l-2.5 2.5a.6.6 0 0 1-.42.18z"/></svg>
+            <span class="category-sort-label" data-i18n="actions.sortCategories">分類排序</span>
           </button>
           <button type="button" id="btn-add-action" data-i18n="header.addAction">＋ 新增動作</button>
         </div>
@@ -594,6 +567,7 @@
             <button type="button" id="tab-global" class="action-tab" role="tab" aria-selected="false" data-i18n="tabs.global">通用</button>
           </div>
           <span class="spacer"></span>
+          <button type="button" id="btn-toggle-hidden-global" class="hidden-global-toggle" aria-pressed="false" hidden></button>
           <button type="button" id="btn-toggle-split" class="split-toggle" aria-pressed="false"></button>
         </div>
         <div id="action-panes" hidden>
@@ -815,17 +789,19 @@ const I18N = {
     "header.editProject": "專案設定",
     "header.addAction": "＋ 新增動作",
     "header.addGlobalAction": "＋ 新增通用動作",
-    "actions.manageMode": "動作管理",
-    "actions.manageModeOffTitle": "開啟動作管理（編輯、隱藏動作與分類排序）",
-    "actions.manageModeOnTitle": "關閉動作管理",
+    "actions.sortCategories": "分類排序",
+    "actions.sortCategoriesOffTitle": "開啟分類拖曳排序",
+    "actions.sortCategoriesDone": "結束分類排序",
+    "actions.sortCategoriesDisabled": "至少需要 2 個分類才能排序",
     "tabs.global": "通用",
     "tabs.splitEnable": "並列顯示",
     "tabs.splitDisable": "分頁顯示",
     "tabs.splitUnavailable": "面板寬度不足時自動暫時切換為分頁顯示",
     "tabs.addShort": "＋ 新增",
     "global.notice": "編輯的是跨專案通用按鈕，將套用至所有專案（執行時使用當下選中專案的目錄與 venv）。",
-    "global.hide": "隱藏",
-    "global.show": "顯示",
+    "global.showHidden": "顯示已隱藏 ({count})",
+    "global.showHiddenOffTitle": "顯示此專案已隱藏的通用按鈕",
+    "global.showHiddenOnTitle": "不再顯示已隱藏的通用按鈕",
     "global.hiddenBadge": "已隱藏",
     "header.shutdown": "關閉工具",
     "header.shutdownTitle": "停止 devdeck 伺服器",
@@ -846,7 +822,6 @@ const I18N = {
     "output.resizeHint": "拖曳調整輸出寬度（雙擊重設）",
     "common.cancel": "取消",
     "common.save": "儲存",
-    "common.edit": "編輯",
     "common.delete": "刪",
     "common.browse": "瀏覽…",
     "pick.projectPath": "選擇專案資料夾",
@@ -931,10 +906,12 @@ const I18N = {
     "empty.noProjectOption": "（尚無專案）",
     "empty.noAction": "此專案還沒有動作，按「＋ 新增動作」從腳本目錄挑選。",
     "empty.noGlobalAction": "還沒有通用按鈕，按「＋ 新增通用動作」建立跨專案共用指令或腳本。",
-    "empty.allGlobalHidden": "此專案已隱藏所有通用按鈕；開啟「動作管理」可重新顯示。",
+    "empty.allGlobalHidden": "此專案已隱藏所有通用按鈕；點擊上方「顯示已隱藏」可重新顯示。",
     "cat.uncategorized": "未分類",
     "cat.dragHint": "拖曳調整分類順序",
-    "cat.editHint": "編輯分類名稱",
+    "cat.menuRename": "重新命名",
+    "cat.menuAssign": "指定分類…",
+    "cat.menuClear": "移除分類（移至未分類）",
     "cat.editTitle": "編輯分類",
     "cat.nameLabel": "分類名稱",
     "cat.placeholderNamed": "輸入新分類名稱（留空將移除分類）",
@@ -964,7 +941,7 @@ const I18N = {
     "toast.scriptPathCopied": "已複製腳本路徑",
     "toast.copyCommandFailed": "無法複製指令",
     "toast.copyScriptPathFailed": "無法複製腳本路徑",
-    "toast.globalHiddenHint": "已隱藏「{label}」，可開啟「動作管理」重新顯示",
+    "toast.globalHiddenHint": "已隱藏「{label}」，可點擊「顯示已隱藏」重新顯示",
     "confirm.delSvc": "刪除服務「{name}」？",
     "confirm.delProject": "刪除專案「{name}」及其所有動作設定？（不會動到專案檔案本身）",
     "confirm.delAction": "刪除動作「{label}」？",
@@ -1020,17 +997,19 @@ const I18N = {
     "header.editProject": "Project settings",
     "header.addAction": "+ Add action",
     "header.addGlobalAction": "+ Add global action",
-    "actions.manageMode": "Manage actions",
-    "actions.manageModeOffTitle": "Enable action management (edit/hide actions and reorder categories)",
-    "actions.manageModeOnTitle": "Disable action management",
+    "actions.sortCategories": "Reorder categories",
+    "actions.sortCategoriesOffTitle": "Enable category drag-and-drop reordering",
+    "actions.sortCategoriesDone": "Done reordering categories",
+    "actions.sortCategoriesDisabled": "At least 2 categories are required to reorder",
     "tabs.global": "Global",
     "tabs.splitEnable": "Side-by-side",
     "tabs.splitDisable": "Tabs view",
     "tabs.splitUnavailable": "Panel too narrow for side-by-side view; showing tabs",
     "tabs.addShort": "+ Add",
     "global.notice": "Editing a cross-project global button. Changes apply to all projects (runs in the active project's directory and venv).",
-    "global.hide": "Hide",
-    "global.show": "Show",
+    "global.showHidden": "Show hidden ({count})",
+    "global.showHiddenOffTitle": "Show hidden global actions for this project",
+    "global.showHiddenOnTitle": "Stop showing hidden global actions",
     "global.hiddenBadge": "Hidden",
     "header.shutdown": "Shut down",
     "header.shutdownTitle": "Stop the devdeck server",
@@ -1051,7 +1030,6 @@ const I18N = {
     "output.resizeHint": "Drag to resize output width (double-click to reset)",
     "common.cancel": "Cancel",
     "common.save": "Save",
-    "common.edit": "Edit",
     "common.delete": "Del",
     "common.browse": "Browse…",
     "pick.projectPath": "Select project folder",
@@ -1136,10 +1114,12 @@ const I18N = {
     "empty.noProjectOption": "(No projects yet)",
     "empty.noAction": 'No actions yet — click "+ Add action" to pick from the scripts folder.',
     "empty.noGlobalAction": 'No global actions yet — click "+ Add global action" to create a shared command or script.',
-    "empty.allGlobalHidden": 'All global actions are hidden for this project. Turn on "Manage actions" to unhide.',
+    "empty.allGlobalHidden": 'All global actions are hidden for this project. Click "Show hidden" above to unhide.',
     "cat.uncategorized": "Uncategorized",
     "cat.dragHint": "Drag to reorder category",
-    "cat.editHint": "Edit category name",
+    "cat.menuRename": "Rename",
+    "cat.menuAssign": "Assign category…",
+    "cat.menuClear": "Remove category (move to Uncategorized)",
     "cat.editTitle": "Edit category",
     "cat.nameLabel": "Category name",
     "cat.placeholderNamed": "Enter a new category name (leave blank to uncategorize)",
@@ -1169,7 +1149,7 @@ const I18N = {
     "toast.scriptPathCopied": "Script path copied",
     "toast.copyCommandFailed": "Failed to copy command",
     "toast.copyScriptPathFailed": "Failed to copy script path",
-    "toast.globalHiddenHint": 'Hidden "{label}". Turn on "Manage actions" to show it again.',
+    "toast.globalHiddenHint": 'Hidden "{label}". Click "Show hidden" to show it again.',
     "confirm.delSvc": 'Delete service "{name}"?',
     "confirm.delProject": 'Delete project "{name}" and all its action settings? (Project files are left untouched.)',
     "confirm.delAction": 'Delete action "{label}"?',
@@ -1271,7 +1251,8 @@ function setLang(lang) {
   renderProjectList();
   applySidebarUI();
   applyProjectSortUI();
-  applyActionManageUI();
+  applyHiddenGlobalUI();
+  applyCategorySortUI();
   applyOutputUI();
   syncAdminField();
   renderActionTabs();
@@ -1314,7 +1295,8 @@ const state = {
   sidebarCollapsedWide: localStorage.getItem("devdeck.sidebarCollapsedWide") === "1",
   sidebarDrawerOpen: false,
   projectSortMode: false,
-  actionManageMode: false,
+  categorySortMode: false,
+  showHiddenGlobal: false,
   outputCollapsed: {
     wide: localStorage.getItem("devdeck.outputCollapsedWide") === "1",
     narrow: localStorage.getItem("devdeck.outputCollapsedNarrow") !== "0",
@@ -1746,7 +1728,7 @@ async function toggleGlobalActionVisibility(actionId, nextHidden, { showHiddenHi
     await api("PUT", `/api/projects/${state.projectId}/hidden-actions/${actionId}`, { hidden: nextHidden });
     state.globalActions = await api("GET", `/api/global-actions?project_id=${state.projectId}`);
     renderActions();
-    if (nextHidden && showHiddenHint && !state.actionManageMode) {
+    if (nextHidden && showHiddenHint && !state.showHiddenGlobal) {
       showToast(t("toast.globalHiddenHint", { label }), "info", 3200);
     }
   } catch (err) {
@@ -1760,6 +1742,8 @@ const ACTION_ADMIN_ICON_SVG = `<svg viewBox="0 0 16 16" width="15" height="15"><
 const ACTION_SETTINGS_ICON_SVG = `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M6.5 1.5h3l.4 1.9a5.2 5.2 0 0 1 1.25.72l1.85-.62 1.5 2.6-1.45 1.3c.06.4.06.8 0 1.2l1.45 1.3-1.5 2.6-1.85-.62a5.2 5.2 0 0 1-1.25.72l-.4 1.9h-3l-.4-1.9a5.2 5.2 0 0 1-1.25-.72L3 12.5l-1.5-2.6 1.45-1.3a5.1 5.1 0 0 1 0-1.2L1.5 6.1 3 3.5l1.85.62c.39-.29.81-.53 1.25-.72l.4-1.9zM8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg>`;
 const ACTION_EYE_OFF_ICON_SVG = `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M2.3 1.4l12.3 12.3-.9.9-2.1-2.1A7.6 7.6 0 0 1 8 13.5c-3.5 0-6.2-2.4-7.3-5.5a7.8 7.8 0 0 1 2.7-3.8L1.4 2.3l.9-.9zm2 3.7A6.5 6.5 0 0 0 2 8c1 2.5 3.2 4.3 6 4.3 1 0 1.9-.2 2.7-.7l-1.3-1.3a2.7 2.7 0 0 1-3.7-3.7L4.3 5.1zM8 2.5c3.5 0 6.2 2.4 7.3 5.5a7.9 7.9 0 0 1-1.9 3l-.9-.9A6.6 6.6 0 0 0 14 8c-1-2.5-3.2-4.3-6-4.3-.7 0-1.3.1-1.9.3l-1-1A7.7 7.7 0 0 1 8 2.5z"/></svg>`;
 const ACTION_EYE_ICON_SVG = `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M8 3C4.5 3 1.8 5.2.7 8c1.1 2.8 3.8 5 7.3 5s6.2-2.2 7.3-5C14.2 5.2 11.5 3 8 3zm0 8.8c-2.8 0-5-1.7-6-3.8 1-2.1 3.2-3.8 6-3.8s5 1.7 6 3.8c-1 2.1-3.2 3.8-6 3.8zm0-6.3a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg>`;
+const CATEGORY_RENAME_ICON_SVG = `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M12.146 1.854a1.5 1.5 0 0 1 2.122 2.121l-8.5 8.5a.5.5 0 0 1-.22.13l-3 1a.5.5 0 0 1-.633-.633l1-3a.5.5 0 0 1 .13-.22l8.5-8.5zm1.414.707a.5.5 0 0 0-.707 0L11.707 3.707l.586.586 1.146-1.146a.5.5 0 0 0 0-.707zM11 4.414l-7.646 7.646-.53 1.59 1.59-.53L12.06 5.475 11 4.414z"/></svg>`;
+const CATEGORY_CLEAR_ICON_SVG = `<svg viewBox="0 0 16 16" width="15" height="15"><path fill="currentColor" d="M3.5 3.5a.7.7 0 0 1 .99 0L8 7.01l3.51-3.51a.7.7 0 1 1 .99.99L8.99 8l3.51 3.51a.7.7 0 1 1-.99.99L8 8.99 4.49 12.5a.7.7 0 1 1-.99-.99L7.01 8 3.5 4.49a.7.7 0 0 1 0-.99z"/></svg>`;
 
 function buildActionContextMenuItems(action, scope, runBtn) {
   const runDisabled = isActionDisabled(action);
@@ -1841,6 +1825,31 @@ function buildActionContextMenuItems(action, scope, runBtn) {
   return items;
 }
 
+function buildCategoryContextMenuItems(rawCat, scope) {
+  const target = normCategory(rawCat);
+  if (!target) {
+    return [
+      {
+        iconSvg: CATEGORY_RENAME_ICON_SVG,
+        label: t("cat.menuAssign"),
+        onClick: () => openCategoryDialog("", scope),
+      },
+    ];
+  }
+  return [
+    {
+      iconSvg: CATEGORY_RENAME_ICON_SVG,
+      label: t("cat.menuRename"),
+      onClick: () => openCategoryDialog(target, scope),
+    },
+    {
+      iconSvg: CATEGORY_CLEAR_ICON_SVG,
+      label: t("cat.menuClear"),
+      onClick: () => clearCategory(target, scope),
+    },
+  ];
+}
+
 /* ---------- 響應式佈局與側欄／輸出面板控制 ---------- */
 
 const narrowMQ = window.matchMedia("(max-width: 960px)");
@@ -1898,21 +1907,88 @@ function setProjectSortMode(on) {
   applyProjectSortUI();
 }
 
-function applyActionManageUI() {
+function getVisibleActionsForScope(scope) {
+  if (scope === "global") {
+    return state.showHiddenGlobal
+      ? state.globalActions
+      : state.globalActions.filter(a => !a.hidden);
+  }
+  return state.actions;
+}
+
+function getVisibleCategoryCount(scope) {
+  const cats = new Set();
+  for (const a of getVisibleActionsForScope(scope)) {
+    cats.add(normCategory(a.category));
+  }
+  return cats.size;
+}
+
+function canSortVisibleCategories() {
+  if (!state.projectId) return false;
+  if (state.effectiveSplit) {
+    return getVisibleCategoryCount("project") >= 2 || getVisibleCategoryCount("global") >= 2;
+  }
+  return getVisibleCategoryCount(state.activeTab) >= 2;
+}
+
+function applyCategorySortUI() {
   const pane = $("center-pane");
-  const btn = $("btn-action-manage");
-  if (pane) pane.classList.toggle("is-managing-actions", state.actionManageMode);
+  const btn = $("btn-category-sort");
+  const canSort = canSortVisibleCategories();
+  if (!canSort && state.categorySortMode) state.categorySortMode = false;
+  if (pane) pane.classList.toggle("is-sorting-categories", state.categorySortMode);
   if (btn) {
-    btn.setAttribute("aria-checked", String(state.actionManageMode));
-    btn.title = t(state.actionManageMode ? "actions.manageModeOnTitle" : "actions.manageModeOffTitle");
+    btn.disabled = !canSort;
+    btn.classList.toggle("active", state.categorySortMode);
+    btn.setAttribute("aria-pressed", String(state.categorySortMode));
+    const label = t(!canSort
+      ? "actions.sortCategoriesDisabled"
+      : (state.categorySortMode ? "actions.sortCategoriesDone" : "actions.sortCategoriesOffTitle"));
+    btn.title = label;
+    btn.setAttribute("aria-label", label);
+  }
+  for (const [paneId, scope] of [["pane-project", "project"], ["pane-global", "global"]]) {
+    const scopePane = $(paneId);
+    if (!scopePane) continue;
+    const scopeCanSort = getVisibleCategoryCount(scope) >= 2;
+    scopePane.classList.toggle("can-sort", scopeCanSort);
+    scopePane.querySelectorAll(".category-header").forEach(header => {
+      header.draggable = Boolean(state.categorySortMode && scopeCanSort);
+    });
   }
 }
 
-function setActionManageMode(on) {
+function setCategorySortMode(on) {
   closePopupMenu();
-  state.actionManageMode = Boolean(on);
-  applyActionManageUI();
+  state.categorySortMode = Boolean(on) && canSortVisibleCategories();
+  applyCategorySortUI();
+}
+
+function getHiddenGlobalCount() {
+  return state.globalActions.filter(a => a.hidden).length;
+}
+
+function applyHiddenGlobalUI() {
+  const btn = $("btn-toggle-hidden-global");
+  if (!btn) return;
+  const hiddenCount = state.projectId ? getHiddenGlobalCount() : 0;
+  if (hiddenCount === 0 && state.showHiddenGlobal) state.showHiddenGlobal = false;
+  const showBtn = Boolean(state.projectId) && hiddenCount > 0 && (state.effectiveSplit || state.activeTab === "global");
+  btn.hidden = !showBtn;
+  btn.classList.toggle("active", state.showHiddenGlobal);
+  btn.setAttribute("aria-pressed", String(state.showHiddenGlobal));
+  const title = t(state.showHiddenGlobal ? "global.showHiddenOnTitle" : "global.showHiddenOffTitle");
+  btn.title = title;
+  btn.setAttribute("aria-label", title);
+  btn.innerHTML = `${ACTION_EYE_ICON_SVG}<span>${esc(t("global.showHidden", { count: hiddenCount }))}</span>`;
+}
+
+function setShowHiddenGlobal(on) {
+  closePopupMenu();
+  state.showHiddenGlobal = Boolean(on) && getHiddenGlobalCount() > 0;
   if (state.projectId) renderActions();
+  else applyHiddenGlobalUI();
 }
 
 const OUTPUT_MIN_WIDTH = 260;
@@ -2050,6 +2126,8 @@ function applyActionLayout() {
     state.effectiveSplit = false;
     if (ws) ws.classList.remove("split-active");
     applyOutputWidth();
+    applyHiddenGlobalUI();
+    applyCategorySortUI();
     return;
   }
 
@@ -2082,6 +2160,8 @@ function applyActionLayout() {
     addBtn.textContent = t(state.activeTab === "global" ? "header.addGlobalAction" : "header.addAction");
   }
   renderActionTabs();
+  applyHiddenGlobalUI();
+  applyCategorySortUI();
 }
 
 function renderProjectList() {
@@ -2210,7 +2290,9 @@ async function selectProject(id) {
   clearTimeout(state.statusTimer);
   state.statusTimer = null;
 
+  const prevProjectId = state.projectId;
   state.projectId = id;
+  if (id !== prevProjectId) state.showHiddenGlobal = false;
   state.services = [];
   state.status = new Map();
   $("services").innerHTML = "";
@@ -2396,10 +2478,7 @@ function normCategory(cat) {
 
 function renderActionPane(scope, actions, box, emptyEl) {
   box.innerHTML = "";
-  const managing = state.actionManageMode;
-  const visibleActions = scope === "global" && !managing
-    ? actions.filter(a => !a.hidden)
-    : actions;
+  const visibleActions = getVisibleActionsForScope(scope);
 
   emptyEl.hidden = visibleActions.length > 0;
   if (!visibleActions.length) {
@@ -2417,6 +2496,7 @@ function renderActionPane(scope, actions, box, emptyEl) {
     if (!groups.has(rawCat)) groups.set(rawCat, []);
     groups.get(rawCat).push(a);
   }
+  const canDragScope = state.categorySortMode && groups.size >= 2;
 
   for (const [rawCat, items] of groups) {
     const div = document.createElement("div");
@@ -2426,12 +2506,9 @@ function renderActionPane(scope, actions, box, emptyEl) {
 
     const displayCat = rawCat || t("cat.uncategorized");
     div.innerHTML = `
-      <div class="category-header" draggable="${managing ? "true" : "false"}">
+      <div class="category-header" draggable="${canDragScope ? "true" : "false"}">
         <span class="category-handle" title="${esc(t("cat.dragHint"))}">⠿</span>
         <h2>${esc(displayCat)}</h2>
-        <button type="button" class="category-edit" draggable="false" title="${esc(t("cat.editHint"))}" aria-label="${esc(t("cat.editHint"))}">
-          <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M12.146 1.854a1.5 1.5 0 0 1 2.122 2.121l-8.5 8.5a.5.5 0 0 1-.22.13l-3 1a.5.5 0 0 1-.633-.633l1-3a.5.5 0 0 1 .13-.22l8.5-8.5zm1.414.707a.5.5 0 0 0-.707 0L11.707 3.707l.586.586 1.146-1.146a.5.5 0 0 0 0-.707zM11 4.414l-7.646 7.646-.53 1.59 1.59-.53L12.06 5.475 11 4.414z"/></svg>
-        </button>
       </div>`;
     const header = div.querySelector(".category-header");
 
@@ -2455,24 +2532,17 @@ function renderActionPane(scope, actions, box, emptyEl) {
         ? `<span class="confirm-badge" title="${esc(confirmTitle)}" aria-label="${esc(confirmTitle)}"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M8 1.5L2.5 3.8v3.9c0 3.4 2.3 6.3 5.5 7.3 3.2-1 5.5-3.9 5.5-7.3V3.8L8 1.5zm0 1.4l4.1 1.7v3.1c0 2.7-1.7 5-4.1 5.9-2.4-.9-4.1-3.2-4.1-5.9V4.6L8 2.9zm-.7 2.4v3.4h1.4V5.3H7.3zm0 4.4v1.4h1.4V9.7H7.3z"/></svg></span>`
         : "";
       const hiddenBadge = isHidden ? `<span class="hidden-pill">${esc(t("global.hiddenBadge"))}</span>` : "";
-      const hideBtn = scope === "global"
-        ? `<button class="toggle-hide" data-id="${a.id}" data-hidden="${isHidden ? "1" : "0"}">${esc(t(isHidden ? "global.show" : "global.hide"))}</button>`
-        : "";
-      card.innerHTML = `
-        <button class="run" data-id="${a.id}" title="${esc(btnTitle)}"><span class="run-label">${esc(a.label)}</span>${adminBadge}${confirmBadge}${hiddenBadge}</button>
-        <span class="mgmt">
-          ${hideBtn}<button class="edit" data-id="${a.id}" data-scope="${scope}">${t("common.edit")}</button>
-        </span>`;
+      card.innerHTML = `<button class="run" data-id="${a.id}" title="${esc(btnTitle)}"><span class="run-label">${esc(a.label)}</span>${adminBadge}${confirmBadge}${hiddenBadge}</button>`;
       row.appendChild(card);
     }
     div.appendChild(row);
 
     header.ondragstart = e => {
-      if (!state.actionManageMode
-          || (e.target && e.target.closest && e.target.closest(".category-edit"))) {
+      if (!state.categorySortMode || getVisibleCategoryCount(scope) < 2) {
         e.preventDefault();
         return;
       }
+      closePopupMenu();
       window._draggedCategory = div;
       window._draggedCategoryScope = scope;
       e.dataTransfer.effectAllowed = "move";
@@ -2493,11 +2563,11 @@ function renderActionPane(scope, actions, box, emptyEl) {
       });
     };
     div.ondragenter = e => {
-      if (!state.actionManageMode || !window._draggedCategory || window._draggedCategoryScope !== scope) return;
+      if (!state.categorySortMode || !window._draggedCategory || window._draggedCategoryScope !== scope) return;
       e.preventDefault();
     };
     div.ondragover = e => {
-      if (!state.actionManageMode || !window._draggedCategory || window._draggedCategoryScope !== scope) return;
+      if (!state.categorySortMode || !window._draggedCategory || window._draggedCategoryScope !== scope) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
       if (window._draggedCategory === div) return;
@@ -2518,7 +2588,7 @@ function renderActionPane(scope, actions, box, emptyEl) {
       }
     };
     div.ondrop = async e => {
-      if (!state.actionManageMode || !window._draggedCategory || window._draggedCategoryScope !== scope) return;
+      if (!state.categorySortMode || !window._draggedCategory || window._draggedCategoryScope !== scope) return;
       e.preventDefault();
       const dragged = window._draggedCategory;
       div.classList.remove("drag-over-top", "drag-over-bottom");
@@ -2553,6 +2623,7 @@ function renderActionPane(scope, actions, box, emptyEl) {
 
 function renderActions() {
   closePopupMenu();
+  if (getHiddenGlobalCount() === 0) state.showHiddenGlobal = false;
   renderActionPane("project", state.actions, $("action-list-project"), $("empty-project"));
   renderActionPane("global", state.globalActions, $("action-list-global"), $("empty-global"));
   applyButtonStates();
@@ -3177,6 +3248,31 @@ async function saveCategory() {
   }
 }
 
+async function clearCategory(rawCat, scope = "project") {
+  const target = normCategory(rawCat);
+  if (!target) return;
+  const { count } = getCategoryStats(target, scope);
+  if (!count) return;
+  if (!confirm(t("confirm.clearCategory", { name: target, count }))) return;
+  try {
+    const endpoint = scope === "global"
+      ? "/api/global-actions/categories/rename"
+      : `/api/projects/${state.projectId}/categories/rename`;
+    await api("POST", endpoint, {
+      old_category: target,
+      new_category: null,
+    });
+    if (scope === "global") {
+      state.globalActions = await api("GET", `/api/global-actions?project_id=${state.projectId}`);
+    } else {
+      state.actions = await api("GET", `/api/projects/${state.projectId}/actions`);
+    }
+    renderActions();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
 /* ---------- 事件繫結 ---------- */
 
 $("btn-sidebar-toggle").onclick = () => {
@@ -3473,8 +3569,12 @@ $("btn-project-sort").onclick = () => {
   if ($("btn-project-sort").disabled) return;
   setProjectSortMode(!state.projectSortMode);
 };
-$("btn-action-manage").onclick = () => {
-  setActionManageMode(!state.actionManageMode);
+$("btn-category-sort").onclick = () => {
+  if ($("btn-category-sort").disabled) return;
+  setCategorySortMode(!state.categorySortMode);
+};
+$("btn-toggle-hidden-global").onclick = () => {
+  setShowHiddenGlobal(!state.showHiddenGlobal);
 };
 $("btn-shutdown").onclick = async () => {
   if (!confirm(t("confirm.shutdown"))) return;
@@ -3493,38 +3593,38 @@ $("lang-select").onchange = e => setLang(e.target.value);
 $("action-panes").addEventListener("click", async e => {
   const runBtn = e.target.closest("button.run");
   if (runBtn) return runAction(Number(runBtn.dataset.id), runBtn);
-  const hideBtn = e.target.closest("button.toggle-hide");
-  if (hideBtn) {
-    const aid = Number(hideBtn.dataset.id);
-    const nextHidden = hideBtn.dataset.hidden !== "1";
-    await toggleGlobalActionVisibility(aid, nextHidden, { showHiddenHint: false });
-    return;
-  }
-  const editBtn = e.target.closest("button.edit");
-  if (editBtn) return openActionDialog(Number(editBtn.dataset.id), editBtn.dataset.scope || null);
-  const catEditBtn = e.target.closest("button.category-edit");
-  if (catEditBtn) {
-    e.stopPropagation();
-    const catEl = catEditBtn.closest(".category");
-    openCategoryDialog(catEl?.dataset.category || "", catEl?.dataset.scope || "project");
-  }
 });
 $("action-panes").addEventListener("contextmenu", e => {
   if (e.shiftKey) return;
   const card = e.target.closest(".action");
-  if (!card) return;
-  const runBtn = card.querySelector("button.run");
-  const aid = runBtn ? Number(runBtn.dataset.id) : NaN;
-  const action = Number.isFinite(aid) ? findActionById(aid) : null;
-  if (!action) return;
-  const scope = card.closest(".category")?.dataset.scope || (action.is_global ? "global" : "project");
+  if (card) {
+    const runBtn = card.querySelector("button.run");
+    const aid = runBtn ? Number(runBtn.dataset.id) : NaN;
+    const action = Number.isFinite(aid) ? findActionById(aid) : null;
+    if (!action) return;
+    const scope = card.closest(".category")?.dataset.scope || (action.is_global ? "global" : "project");
+    e.preventDefault();
+    openPopupMenu({
+      targetEl: card,
+      point: { x: e.clientX, y: e.clientY },
+      headerText: action.label,
+      items: buildActionContextMenuItems(action, scope, runBtn),
+      contextActionId: action.id,
+    });
+    return;
+  }
+  const catHeader = e.target.closest(".category-header");
+  if (!catHeader) return;
+  const catEl = catHeader.closest(".category");
+  if (!catEl) return;
+  const rawCat = catEl.dataset.category || "";
+  const scope = catEl.dataset.scope || "project";
   e.preventDefault();
   openPopupMenu({
-    targetEl: card,
+    targetEl: catHeader,
     point: { x: e.clientX, y: e.clientY },
-    headerText: action.label,
-    items: buildActionContextMenuItems(action, scope, runBtn),
-    contextActionId: action.id,
+    headerText: rawCat || t("cat.uncategorized"),
+    items: buildCategoryContextMenuItems(rawCat, scope),
   });
 });
 
@@ -3552,7 +3652,8 @@ wirePick("browse-a-workdir", "a-workdir", "pick.workdir", () => $("a-workdir").v
 setLang(detectLang());
 applySidebarUI();
 applyProjectSortUI();
-applyActionManageUI();
+applyHiddenGlobalUI();
+applyCategorySortUI();
 applyOutputUI();
 loadSystemInfo();
 startStatusPolling();

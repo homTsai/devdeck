@@ -91,7 +91,7 @@ Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘
    （例：start 按鈕勾 fastapi「運行中時停用」→ 服務在跑就按不了；dev stop 勾兩個服務
    「停止時停用」→ 兩個都停了才鎖住，只剩一個在跑仍可按）。
 4. 日常使用：選專案 → 點按鈕 → 下方面板即時串流輸出。
-5. 開啟按鈕面板右上角的**動作管理**開關才會顯示編輯／隱藏按鈕與分類排序，避免誤觸；專案面板標題列的排序圖示則用於拖曳調整專案順序。
+5. 對按鈕或分類標題按滑鼠右鍵即可開啟選單進行設定、隱藏／顯示通用按鈕，或重新命名／移除分類；按鈕面板右上角的**分類排序**按鈕用於拖曳調整分類順序（通用面板有隱藏按鈕時可透過**顯示已隱藏**切換檢視），專案面板標題列的排序圖示則用於拖曳調整專案順序。
 
 ### 設計說明
 
@@ -259,7 +259,7 @@ when cloned via a GUI tool such as Sourcetree). Clear it any one of three ways:
    up; a combined dev-stop checked with both services "disable while stopped" only locks when
    both are down).
 4. Daily use: pick a project → click a button → output streams live in the bottom panel.
-5. Enable the **Manage actions** switch at the top right of the action panel to reveal edit/hide buttons and category reordering without accidental clicks, and use the sort icon in the project sidebar header to reorder projects.
+5. Right-click any action button or category header to open the context menu for button settings, hiding/showing global actions, or renaming/removing categories. Use the **Reorder categories** button at the top right of the action panel to drag-and-drop categories (and **Show hidden** in the Global panel when any global button is hidden), and the sort icon in the project sidebar header to reorder projects.
 
 ### Design notes
 
