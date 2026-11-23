@@ -1,13 +1,15 @@
 # devdeck
 
+專案中控台 / Project Control Panel
+
 [繁體中文](#繁體中文) | [English](#english)
 
 ---
 
 ## 繁體中文
 
-本機開發腳本啟動面板：把各專案 `scripts/` 目錄裡的腳本設定成按鈕，點擊即執行、即時看輸出，
-常駐服務（FastAPI / Vite）以 port 探測顯示運行狀態燈。
+devdeck 是本機開發專案的「專案中控台」，讓你為每個專案自訂控制面板，
+集中查看服務運行狀態、一鍵執行腳本或指令，並即時查看執行輸出。
 
 ### 需求（Requirements）
 
@@ -162,9 +164,9 @@ Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘
 
 ## English
 
-A local dev-script launcher panel: turn the scripts in each project's `scripts/` directory into
-buttons — click to run, watch live output, and monitor long-running services (FastAPI / Vite)
-with port-probe status lights.
+devdeck is a local Project Control Panel for development projects. Customize a control panel
+for each project to view service status, run scripts or commands with one click, and see
+execution output in real time.
 
 ### Requirements
 
