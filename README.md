@@ -51,7 +51,7 @@ Port 預設 `7999`；被其他程式占用時自動往下改用 `7998`–`7990`�
 
 Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘選到開始畫面」或「釘選到工作列」。
 
-關閉：面板右上角「關閉工具」按鈕會停止 devdeck 伺服器（不影響已啟動的專案服務）。
+關閉：面板右上角 `⋮` 選單中的「關閉」會停止 devdeck 伺服器（不影響已啟動的專案服務）；選單內亦可切換介面語言（中文／英文）或開啟內建「使用說明」（亦可點擊標題旁 `?` 開啟）。
 
 若頁面顯示「驗證失效」（例如清除過瀏覽器資料），重新點一次啟動捷徑即可重新取得授權。
 
@@ -73,25 +73,28 @@ Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘
 ### 使用流程
 
 1. **新增專案**：設定專案名稱、路徑、腳本目錄（預設 `scripts`）、venv 路徑（預設 `.venv`）。
-2. **編輯專案**內可加入**服務**（名稱 + port + 選填 PID 檔），例如 `fastapi :8000`、`vite :5173`，
-   面板上方會顯示各服務的狀態燈（port 有人聽 = 綠燈）。勾選「**開網頁**」的服務會多一個
-   「開啟 ↗」連結，直接開 `http://localhost:{port}` 首頁（服務停止時連結變暗但仍可點）；
-   不是網頁的 port 不勾即可。
-3. **新增動作**：兩種類型擇一——
+2. **編輯專案與服務**：可於「專案設定」加入**服務**（名稱 + port + 選填 PID 檔），例如 `fastapi :8000`、`vite :5173`，
+   面板上方會顯示各服務的狀態燈（port 有人聽 = 綠燈）。勾選「**開網頁**」的服務在運行中（綠燈）時會顯示
+   `↗` 圖示，直接點擊該服務狀態膠囊即可開啟 `http://localhost:{port}` 首頁（停止時不觸發誤開）；不是網頁的 port 不勾即可。
+   專案標題列（窄面板下會自動收納至 `⋯` 選單）與左側欄專案右鍵選單皆可快速開啟專案設定、外部終端機（一般／管理員）、檔案總管／Finder 或複製專案目錄路徑。
+3. **新增動作與跨專案通用動作**：可設定為**專案動作**或**跨專案通用動作（Global）**（通用動作跨專案共用，執行時自動套用當前專案的工作目錄與 `venv`，支援多個通用腳本目錄或指定絕對路徑），類型兩者擇一：
    - **腳本檔案**：從腳本目錄掃描結果挑選；可填固定的**附加指令參數**（例如
      `--port 8000 --name "My App"`），每次按下按鈕都會附加到腳本後；
    - **直接指令**：直接輸入指令（如 `alembic upgrade head`），會在工作目錄以 shell 執行，
      且專案 venv 已掛入 PATH（指令可直接使用 venv 內的 alembic / python 等工具）。
 
-   每個動作都可選擇執行方式：**面板執行**（預設，輸出串流回 devdeck）或**外部終端機**
-   （使用相同工作目錄與參數另開可互動的 PowerShell／Terminal；輸出與輸入都在該視窗）。
+   每個動作皆可選擇三種執行方式：**面板執行**（預設，輸出即時串流至右側輸出面板）、**外部終端機**（另開可互動的 PowerShell／Terminal；輸出與輸入都在該視窗），或**外部終端機（管理員）**（Windows 觸發 UAC 提權／macOS 以 `sudo` 執行）。
 
-   再設定顯示名稱、分類、工作目錄（預設專案路徑），並可勾選**按鈕狀態關聯**：
-   對每個勾選的服務選擇「運行中時停用」或「停止時停用」，勾選的條件**全部成立**時該按鈕會停用
-   （例：start 按鈕勾 fastapi「運行中時停用」→ 服務在跑就按不了；dev stop 勾兩個服務
-   「停止時停用」→ 兩個都停了才鎖住，只剩一個在跑仍可按）。
-4. 日常使用：選專案 → 點按鈕 → 下方面板即時串流輸出。
-5. 對按鈕或分類標題按滑鼠右鍵即可開啟選單進行設定、隱藏／顯示通用按鈕，或重新命名／移除分類；按鈕面板右上角的**分類排序**按鈕用於拖曳調整分類順序（通用面板有隱藏按鈕時可透過**顯示已隱藏**切換檢視），專案面板標題列的排序圖示則用於拖曳調整專案順序。
+   再設定顯示名稱、分類、工作目錄（預設專案路徑），並可設定兩項防呆保護：
+   - **按鈕狀態關聯**：對每個勾選的服務選擇「運行中時停用」或「停止時停用」，勾選的條件**全部成立**時該按鈕會停用
+     （例：start 按鈕勾 fastapi「運行中時停用」→ 服務在跑就按不了；dev stop 勾兩個服務
+     「停止時停用」→ 兩個都停了才鎖住，只剩一個在跑仍可按）。
+   - **執行前確認**：高風險動作可勾選執行前彈出確認對話框（支援自訂確認提示訊息）。
+4. **日常使用與版面配置**：選專案 → 點按鈕 → 右側輸出面板即時串流輸出（窄視窗下自動轉為下方）。支援切換「分頁顯示／並列顯示」；可拖曳輸出面板分隔線調整寬度或雙擊重設，亦可透過輸出面板標題列按鈕快速切換「最小可用寬度／並列最大寬度／最大寬度（自動收合左側欄）／重設預設寬度」。
+5. **右鍵選單與排序**：
+   - 對**左側欄專案**按右鍵：開啟專案、專案設定、開啟外部終端機（一般／管理員）、開啟資料夾、複製目錄路徑。
+   - 對**動作按鈕**按右鍵：執行、單次以一般／管理員外部終端機開啟、複製指令、複製腳本路徑、按鈕設定（編輯／刪除）、隱藏／顯示（通用按鈕）。
+   - 對**分類標題**按右鍵：重新命名、合併至既有分類、移除分類（歸入未分類）或為「未分類」批次指定分類；右上角**分類排序**可拖曳調整分類順序（有隱藏通用按鈕時可透過**顯示已隱藏**切換檢視），左側欄**排序專案**圖示則用於拖曳調整專案順序。
 
 ### 設計說明
 
@@ -145,8 +148,7 @@ Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘
 - **關閉 cloudflared（或其他常駐服務）要不要加 `-Force`？** 這是使用建議、非 devdeck 行為：PowerShell 的
   `Stop-Process` **無論加不加 `-Force`，對 console 程式都是硬砍**（底層 `TerminateProcess`）；`-Force` 只決定
   「跳不跳確認 / 能否砍非自己擁有的程序」，**與優雅登出無關**。要讓 cloudflared 優雅 drain 並向 edge 註銷：
-  **Unix** 用 `kill -2 <pid>`（SIGINT）；**Windows** 的 `Stop-Process` 做不到，最實際是把該服務開在**外部
-  終端機**再按 Ctrl-C（後續規劃的 `in_terminal` 動作會直接支援）。
+  **Unix** 用 `kill -2 <pid>`（SIGINT）；**Windows** 的 `Stop-Process` 做不到，最實際是將該動作設為**外部終端機**模式（或在按鈕上按右鍵單次以「外部終端機」開啟）再按 Ctrl-C。
 - **按「瀏覽…」選資料夾時沒反應**：路徑欄位的資料夾選擇器由後端叫出系統原生視窗，需要 Python 的
   tkinter。Windows／macOS 的官方 Python 已內建；**Linux**（非官方支援）多半要另裝，例如
   `sudo apt install python3-tk`。若無法安裝也不影響——路徑欄位一律可手動輸入。
@@ -154,8 +156,6 @@ Windows 建立捷徑後，可在開始功能表搜尋 **devdeck**，右鍵「釘
 ### 開發計畫（Roadmap）
 
 - 腳本檔案型動作支援**右鍵開啟對話框**，臨時輸入僅此一次的命令參數後執行。
-- **非專案型指令的歸納**（全域動作群組）；現階段可先把使用者家目錄
-  （如 `C:\Users\{user}`）新增為一個「專案」暫代。
 - （探索中）**後端行程生命週期管理**，讓服務可在 devdeck 內一鍵啟停；設計討論見 `docs/service-lifecycle-plan.md`。
 
 ---
@@ -215,8 +215,9 @@ read it and verify via the `/health` endpoint that it is really devdeck). Set th
 On Windows, after creating the shortcut, search for **devdeck** in the Start Menu and pin it
 to Start or the taskbar.
 
-To stop: the "close tool" button at the top right shuts down the devdeck server (it does not
-touch any project services you started).
+To stop: use "Close" in the top-right `⋮` menu to shut down the devdeck server (it does not
+touch any project services you started). The `⋮` menu also lets you switch the UI language
+(中文 / English) or open the built-in User Guide (also accessible via `?` next to the title).
 
 If the page says the token is missing or invalid (e.g. after clearing browser data), simply
 launch devdeck from its shortcut again.
@@ -241,25 +242,50 @@ when cloned via a GUI tool such as Sourcetree). Clear it any one of three ways:
 ### Workflow
 
 1. **Add a project**: name, path, scripts directory (default `scripts`), venv path (default `.venv`).
-2. **Edit the project** to add **services** (name + port + optional PID file), e.g.
+2. **Edit project & services**: In "Project settings", add **services** (name + port + optional PID file), e.g.
    `fastapi :8000`, `vite :5173`. The panel shows a status light per service (green when the
-   port is listening). Services with **open homepage** checked get an "open ↗" link to
-   `http://localhost:{port}` (dimmed while stopped, still clickable). Leave it unchecked for
-   non-web ports.
-3. **Add an action**, one of two kinds:
+   port is listening). Services with **open homepage** checked show a `↗` icon while running
+   (green); click the running service pill directly to open `http://localhost:{port}` (clicks
+   are ignored while stopped). Leave it unchecked for non-web ports.
+   Use the project header bar icons (automatically tucked into the `⋯` menu when the pane is
+   narrow) or right-click a project in the left sidebar to open Project settings, launch an
+   external terminal (standard / Admin), open File Explorer / Finder, or copy the project path.
+3. **Add an action (Project or Global)**: Actions can be scoped to a single **project** or created
+   as **Global actions** shared across all projects (automatically using the currently selected
+   project's working directory and `venv`, supporting multiple global script folders or absolute
+   paths). Choose one of two action kinds:
    - **Script file**: picked from a scan of the scripts directory; it can have persistent
      **extra arguments** such as `--port 8000 --name "My App"`, appended on every run;
    - **Raw command**: e.g. `alembic upgrade head`, executed via shell in the working directory
      with the project venv prepended to PATH (so venv tools like alembic/python resolve directly).
 
+   Choose one of three run modes: **Panel** (default, streams live output to the right-hand
+   output panel), **External terminal** (opens an interactive PowerShell / Terminal window), or
+   **External terminal (Admin)** (triggers Windows UAC elevation or runs with `sudo` on macOS).
+
    Then set the label, category, working directory (defaults to the project path), and
-   optionally **button-state rules**: for each checked service choose "disable while running"
-   or "disable while stopped"; the button is disabled only when **all** checked conditions hold
-   (e.g. a start button checked with fastapi "disable while running" locks while the service is
-   up; a combined dev-stop checked with both services "disable while stopped" only locks when
-   both are down).
-4. Daily use: pick a project → click a button → output streams live in the bottom panel.
-5. Right-click any action button or category header to open the context menu for button settings, hiding/showing global actions, or renaming/removing categories. Use the **Reorder categories** button at the top right of the action panel to drag-and-drop categories (and **Show hidden** in the Global panel when any global button is hidden), and the sort icon in the project sidebar header to reorder projects.
+   optionally configure two safety guardrails:
+   - **Button-state rules**: for each checked service choose "disable while running" or
+     "disable while stopped"; the button is disabled only when **all** checked conditions hold
+     (e.g. a start button checked with fastapi "disable while running" locks while the service is
+     up; a combined dev-stop checked with both services "disable while stopped" only locks when
+     both are down).
+   - **Confirmation before run**: high-risk actions can prompt a confirmation dialog before
+     execution (with an optional custom message).
+4. **Daily use & layout**: pick a project → click a button → output streams live in the right-hand
+   output panel (moves to the bottom on narrow viewports). Toggle between **Tabs** and
+   **Side-by-side** views; drag the output divider to resize or double-click to reset, or use
+   the output header preset buttons for Minimum / Max for side-by-side / Maximum (auto-collapses
+   the left sidebar) / Reset default width.
+5. **Context menus & reordering**:
+   - **Right-click a sidebar project**: open project, Project settings, open external terminal
+     (standard / Admin), open folder, or copy directory path.
+   - **Right-click an action button**: run, run once in external terminal (standard / Admin),
+     copy command, copy script path, button settings (edit / delete), or hide / show (global actions).
+   - **Right-click a category header**: rename, merge into an existing category, remove category
+     (move to Uncategorized), or batch-assign a category for "Uncategorized". Use **Reorder categories**
+     at the top right of the action panel to drag-and-drop categories (**Show hidden** appears when
+     any global button is hidden), and the sort icon in the project sidebar header to reorder projects.
 
 ### Design notes
 
@@ -336,8 +362,7 @@ when cloned via a GUI tool such as Sourcetree). Clear it any one of three ways:
 ### Roadmap
 
 - Right-click a script-file action to enter one-time arguments in a dialog before running.
-- A proper home for non-project commands (a global action group); for now, adding your home
-  directory (e.g. `C:\Users\{user}`) as a "project" works as a stopgap.
+- (Exploring) **Backend process lifecycle management** so services can be started/stopped directly in devdeck; see `docs/service-lifecycle-plan.md` for design notes.
 
 ---
 

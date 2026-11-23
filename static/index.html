@@ -4107,7 +4107,7 @@ const HELP_CONTENT = {
       <h4>1. 快速上手（Quick Start）</h4>
       <ul>
         <li><strong>① 建立專案</strong>：設定專案名稱、專案路徑、腳本目錄（預設 <code>scripts</code>）與 Python <code>venv</code> 路徑（預設 <code>.venv</code>）。</li>
-        <li><strong>② 設定服務與動作</strong>：於「專案設定」加入常駐服務（Port 狀態燈監測與「開啟 ↗」網頁連結）；新增「腳本檔案」或「直接指令」動作按鈕。</li>
+        <li><strong>② 設定服務與動作</strong>：於「專案設定」加入常駐服務（Port 狀態燈監測與點擊開網頁）；新增「腳本檔案」或「直接指令」動作按鈕。</li>
         <li><strong>③ 點擊執行與檢視輸出</strong>：左鍵點擊動作按鈕即執行，右側輸出面板即時串流輸出結果。</li>
       </ul>
     </section>
@@ -4115,8 +4115,8 @@ const HELP_CONTENT = {
       <h4>2. 專案與服務監測（Projects &amp; Services）</h4>
       <ul>
         <li><strong>側欄切換與排序</strong>：左側欄可切換專案、開啟「排序專案」拖曳調整順序；窄視窗下可切換固定（Pin）或抽屜收合。</li>
-        <li><strong>專案設定與目錄快捷操作</strong>：點擊專案標題列的設定／資料夾圖示，或對左側欄專案按<strong>滑鼠右鍵</strong>，可開啟「專案設定」、開啟外部終端機（一般／管理員）、開啟檔案總管／Finder 或複製專案目錄路徑。</li>
-        <li><strong>服務狀態燈</strong>：依 Port 探測顯示綠燈（運行中）／灰燈（已停止），設定 PID 檔時一併顯示 PID 或殘留提示；點擊「開網頁」可一鍵開啟 <code>http://localhost:{port}</code>。</li>
+        <li><strong>專案設定與目錄快捷操作</strong>：點擊專案標題列的設定／資料夾圖示（窄面板下會自動收納至右上角 <code>⋯</code> 選單），或對左側欄專案按<strong>滑鼠右鍵</strong>，可開啟「專案設定」、開啟外部終端機（一般／管理員）、開啟檔案總管／Finder 或複製專案目錄路徑。</li>
+        <li><strong>服務狀態燈</strong>：依 Port 探測顯示綠燈（運行中）／灰燈（已停止），設定 PID 檔時一併顯示 PID 或殘留提示；勾選「開網頁」的服務在運行（綠燈）時，直接點擊服務狀態燈即可開啟 <code>http://localhost:{port}</code>。</li>
       </ul>
     </section>
     <section class="help-section">
@@ -4152,7 +4152,7 @@ const HELP_CONTENT = {
         <li><strong>對「動作按鈕」按右鍵</strong>：執行、單次用外部終端機（一般／管理員）開啟、複製指令、複製腳本路徑、<strong>按鈕設定（重新編輯／刪除）</strong>、隱藏／顯示（通用按鈕）。</li>
         <li><strong>對「左側欄專案」按右鍵</strong>：開啟專案、<strong>專案設定（重新編輯／刪除／管理服務）</strong>、開啟外部終端機（一般／管理員）、開啟資料夾、複製目錄路徑。</li>
         <li><strong>對「分類標題」按右鍵</strong>：重新命名分類、合併至既有分類、移除分類（歸入未分類），或為「未分類」批次指定分類；面板右上角「分類排序」可拖曳調整分類順序。</li>
-        <li><strong>輸出面板調整</strong>：拖曳中間分隔線調整寬度，<strong>雙擊分隔線</strong>重設回預設寬度；亦可透過標題列按鈕快速切換「最小可用寬度／並列最大寬度／最大寬度／重設預設寬度」，或收合／展開與清除輸出。</li>
+        <li><strong>輸出面板調整</strong>：拖曳中間分隔線調整寬度，<strong>雙擊分隔線</strong>重設回預設寬度；亦可透過標題列按鈕快速切換「最小可用寬度／並列最大寬度／最大寬度（自動收合左側欄）／重設預設寬度」，或收合／展開與清除輸出。</li>
         <li><strong>導覽列與右端選單（<code>⋮</code>）</strong>：點擊中央標題旁 <code>?</code> 可開啟使用說明；右上角 <code>⋮</code> 選單可<strong>切換介面語言（中文／英文）</strong>、開啟使用說明，或<strong>關閉</strong> devdeck 伺服器。</li>
       </ul>
     </section>
@@ -4191,7 +4191,7 @@ const HELP_CONTENT = {
       <h4>1. Quick Start</h4>
       <ul>
         <li><strong>① Create a Project</strong>: Set the project name, project path, scripts folder (default <code>scripts</code>), and Python <code>venv</code> path (default <code>.venv</code>).</li>
-        <li><strong>② Configure Services &amp; Actions</strong>: In "Project settings", add background services (Port status indicator and "Open ↗" web link); add "Script file" or "Direct command" action buttons.</li>
+        <li><strong>② Configure Services &amp; Actions</strong>: In "Project settings", add background services (Port status indicator and click-to-open web link); add "Script file" or "Direct command" action buttons.</li>
         <li><strong>③ Click to Run &amp; View Output</strong>: Left-click an action button to execute it and stream live output in the right-hand output panel.</li>
       </ul>
     </section>
@@ -4199,8 +4199,8 @@ const HELP_CONTENT = {
       <h4>2. Projects &amp; Services</h4>
       <ul>
         <li><strong>Sidebar Switching &amp; Reordering</strong>: Switch projects in the left sidebar or enable "Reorder projects" to drag and reorder; in narrow windows, toggle between pinned sidebar and collapsible drawer.</li>
-        <li><strong>Project Settings &amp; Directory Shortcuts</strong>: Click the settings/folder icon in the project header bar, or <strong>right-click</strong> a project in the left sidebar to open "Project settings", launch an external terminal (standard / Admin), open File Explorer / Finder, or copy the project directory path.</li>
-        <li><strong>Service Status Indicators</strong>: Probes the configured port to show a green dot (Running) or gray dot (Stopped), alongside the PID or stale PID file warning when a PID file is set; click "Open web" for a one-click link to <code>http://localhost:{port}</code>.</li>
+        <li><strong>Project Settings &amp; Directory Shortcuts</strong>: Click the settings/folder icon in the project header bar (automatically tucked into the <code>⋯</code> menu when the pane is narrow), or <strong>right-click</strong> a project in the left sidebar to open "Project settings", launch an external terminal (standard / Admin), open File Explorer / Finder, or copy the project directory path.</li>
+        <li><strong>Service Status Indicators</strong>: Probes the configured port to show a green dot (Running) or gray dot (Stopped), alongside the PID or stale PID file warning when a PID file is set; for services with "Open web" enabled, click the running (green) service pill to open <code>http://localhost:{port}</code>.</li>
       </ul>
     </section>
     <section class="help-section">
@@ -4236,7 +4236,7 @@ const HELP_CONTENT = {
         <li><strong>Right-click an "Action Button"</strong>: Run, run once in external terminal (standard / Admin), copy command, copy script path, <strong>Button settings (edit / delete)</strong>, or Hide / Show (global actions).</li>
         <li><strong>Right-click a "Sidebar Project"</strong>: Open project, <strong>Project settings (edit / delete / manage services)</strong>, open external terminal (standard / Admin), open folder, or copy directory path.</li>
         <li><strong>Right-click a "Category Header"</strong>: Rename category, merge into an existing category, remove category (move to Uncategorized), or batch-assign a category for "Uncategorized"; use "Reorder categories" in the top-right of the actions pane to drag and reorder categories.</li>
-        <li><strong>Output Panel Resizing</strong>: Drag the divider to resize width, or <strong>double-click the divider</strong> to reset to the default width; you can also use the header preset buttons for Minimum / Max for side-by-side / Maximum / Reset default width, or collapse / expand / clear the output.</li>
+        <li><strong>Output Panel Resizing</strong>: Drag the divider to resize width, or <strong>double-click the divider</strong> to reset to the default width; you can also use the header preset buttons for Minimum / Max for side-by-side / Maximum (auto-collapses the left sidebar) / Reset default width, or collapse / expand / clear the output.</li>
         <li><strong>Header &amp; Top-Right Menu (<code>⋮</code>)</strong>: Click <code>?</code> next to the center title to open this guide; use the top-right <code>⋮</code> menu to <strong>switch language (中文 / English)</strong>, open the User Guide, or <strong>close</strong> the devdeck server.</li>
       </ul>
     </section>
