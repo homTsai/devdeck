@@ -149,7 +149,7 @@
     display: flex; flex-direction: row; overflow: hidden;
   }
   #center-pane {
-    flex: 1 1 0; min-width: 260px; min-height: 0;
+    flex: 1 1 0; min-width: 280px; min-height: 0;
     display: flex; flex-direction: column; overflow: hidden;
     container-type: inline-size; container-name: center-pane;
   }
@@ -2572,6 +2572,7 @@ function applyActionLayout() {
   const effectiveSplit = state.splitMode && canSplit && !isOutputTooWideForSplit(ws);
   state.effectiveSplit = effectiveSplit;
 
+  const wasSplit = panes.classList.contains("is-split");
   if (ws) ws.classList.toggle("split-active", effectiveSplit);
   tabsBar.classList.toggle("is-split", effectiveSplit);
   panes.classList.toggle("is-split", effectiveSplit);
@@ -2599,6 +2600,15 @@ function applyActionLayout() {
   renderActionTabs();
   applyHiddenGlobalUI();
   applyCategorySortUI();
+
+  if (wasSplit && !effectiveSplit) {
+    const content = $("content");
+    if (content) {
+      content.style.overflowY = "hidden";
+      void content.offsetHeight;
+      content.style.overflowY = "";
+    }
+  }
 }
 
 function renderProjectList() {
