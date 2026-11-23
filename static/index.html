@@ -206,18 +206,6 @@
     #btn-project-bar-more {
       display: inline-flex;
     }
-    .split-toggle, .hidden-global-toggle {
-      padding: 5px 7px;
-    }
-    .split-toggle .tab-btn-label, .hidden-global-toggle .tab-btn-label {
-      display: none;
-    }
-    .action-tab .tab-proj-full {
-      display: none;
-    }
-    .action-tab .tab-proj-short {
-      display: inline;
-    }
   }
   #content { flex: 1; overflow-y: auto; padding: 16px; min-height: 0; }
   .empty { color: var(--muted); text-align: center; margin-top: 60px; }
@@ -341,6 +329,20 @@
     background: rgba(79,140,255,.16); border-color: var(--accent); color: #fff;
   }
   .split-toggle:disabled { opacity: .4; cursor: not-allowed; }
+  @container center-pane (max-width: 440px) {
+    .split-toggle, .hidden-global-toggle {
+      padding: 5px 7px;
+    }
+    .split-toggle .tab-btn-label, .hidden-global-toggle .tab-btn-label {
+      display: none;
+    }
+    .action-tab .tab-proj-full {
+      display: none;
+    }
+    .action-tab .tab-proj-short {
+      display: inline;
+    }
+  }
   #action-panes { display: block; }
   #action-panes.is-split {
     display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
